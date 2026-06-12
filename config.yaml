@@ -51,6 +51,18 @@ embedding:
     - 03-资源
   chunk_max_chars: 800                     # 单块最大字符，超长章节再切
 
+# 多模态（图片 / 视频）—— 豆包视觉/视频接入点，走 Ark Files API + Responses API
+# 上传本地图片/视频 → 模型直接识别成文字材料（不本地 OCR）→ 再走 digest 消化成笔记。
+# model 留空则上传图片/视频时跳过并提示未配置；建议在 .env 设 VISION_MODEL 覆盖。
+vision:
+  model: ""                                # 视觉/视频接入点 ID（如 doubao-1.5-vision-pro 的 ep-…）
+  base_url: https://ark.cn-beijing.volces.com/api/v3
+  api_key_env: ARK_API_KEY
+  fps: 1.0                                  # 视频抽帧率（服务端按此采样）
+  max_output_tokens: 4096
+  timeout_seconds: 300
+  active_timeout_seconds: 180               # 等待文件预处理(active)的上限
+
 # 抓取器开关
 fetchers:
   github: true
@@ -58,6 +70,7 @@ fetchers:
   webpage: true
   pdf: true
   docx: true
+  media: true                            # 图片/视频多模态（需配 vision.model / .env VISION_MODEL）
   douyin: false                          # 首版关闭，需要 whisper
 
 # ⚠️ 归位目录的单一来源已迁移到 profile.yaml 的 taxonomy 段

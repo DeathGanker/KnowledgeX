@@ -92,6 +92,8 @@ _CONFIG_ENV_OVERRIDES = {
     "LLM_MODEL": ("llm", "model"),
     "EMBEDDING_URL": ("embedding", "url"),
     "EMBEDDING_MODEL": ("embedding", "model"),
+    "VISION_MODEL": ("vision", "model"),
+    "VISION_BASE_URL": ("vision", "base_url"),
 }
 
 

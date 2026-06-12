@@ -22,6 +22,9 @@ ATTACHMENT_EXTS = {
     ".pdf": "pdf",
     ".docx": "docx",
     ".doc": "docx",
+    # 图片 / 视频 → 多模态（豆包视觉/视频，Files+Responses API）
+    ".png": "media", ".jpg": "media", ".jpeg": "media", ".webp": "media", ".gif": "media", ".bmp": "media",
+    ".mp4": "media", ".mov": "media", ".m4v": "media", ".webm": "media", ".avi": "media", ".mkv": "media",
 }
 
 

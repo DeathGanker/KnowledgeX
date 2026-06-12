@@ -17,9 +17,14 @@ from web.config import PIPELINE_CONFIG, PIPELINE_DIR, VAULT_ROOT
 
 SCRIPT = PIPELINE_DIR / "scripts" / "process_inbox.py"
 
-# 可上传的本地文件类型（管道现有 pdf/docx fetcher 能抽取消化；图片/扫描件待 Phase 2 视觉模型）
-_UPLOAD_EXTS = {".pdf", ".doc", ".docx"}
-_UPLOAD_MAX_BYTES = 30 * 1024 * 1024  # 30MB
+# 可上传的本地文件类型：
+#  - 文档 pdf/doc/docx → pdf/docx fetcher 本地抽文本
+#  - 图片/视频 → media fetcher 走豆包多模态识别（需配 VISION_MODEL）
+_DOC_EXTS = {".pdf", ".doc", ".docx"}
+_MEDIA_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp",
+               ".mp4", ".mov", ".m4v", ".webm", ".avi", ".mkv"}
+_UPLOAD_EXTS = _DOC_EXTS | _MEDIA_EXTS
+_UPLOAD_MAX_BYTES = 300 * 1024 * 1024  # 300MB（视频可能较大）
 
 
 def save_uploaded_to_inbox(filename: str, data: bytes) -> dict:
@@ -27,7 +32,7 @@ def save_uploaded_to_inbox(filename: str, data: bytes) -> dict:
     name = (filename or "").strip()
     ext = ("." + name.rsplit(".", 1)[-1].lower()) if "." in name else ""
     if ext not in _UPLOAD_EXTS:
-        raise ValueError(f"暂不支持的文件类型：{ext or '无扩展名'}（当前支持 PDF / Word）")
+        raise ValueError(f"暂不支持的文件类型：{ext or '无扩展名'}（支持 PDF / Word / 图片 / 视频）")
     if not data:
         raise ValueError("文件为空")
     if len(data) > _UPLOAD_MAX_BYTES:
