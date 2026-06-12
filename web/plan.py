@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Generator, Optional
 
 from web import chat
-from web.config import PIPELINE_CONFIG, VAULT_ROOT
+from web.config import PIPELINE_CONFIG, VAULT_ROOT, llm_extra_body
 from web.rag import retriever
 from scripts.persona import render_persona
 
@@ -202,6 +202,7 @@ def stream_plan(
     try:
         stream = client.chat.completions.create(
             model=llm_cfg["model"],
+            extra_body=llm_extra_body(llm_cfg),
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_content},

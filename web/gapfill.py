@@ -16,7 +16,7 @@ from typing import Optional
 
 import requests
 
-from web.config import PIPELINE_CONFIG, VAULT_ROOT
+from web.config import PIPELINE_CONFIG, VAULT_ROOT, llm_extra_body
 from web import chat
 
 
@@ -106,6 +106,7 @@ def suggest_gaps(question: str, recalled_titles: list[str] | None = None) -> lis
     try:
         resp = client.chat.completions.create(
             model=llm_cfg["model"],
+            extra_body=llm_extra_body(llm_cfg),
             messages=[
                 {"role": "system", "content": _GAP_SUGGEST_SYSTEM},
                 {"role": "user", "content": user_input},

@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 from openai import OpenAI
 
 from fetchers.base import FetcherResult
+from paths import llm_extra_body
 from persona import render_persona, render_taxonomy
 
 
@@ -90,6 +91,7 @@ def digest(fetched: FetcherResult, *, llm_cfg: dict) -> tuple[str, Optional[str]
     try:
         resp = client.chat.completions.create(
             model=llm_cfg["model"],
+            extra_body=llm_extra_body(llm_cfg),
             messages=messages,
             temperature=llm_cfg.get("temperature", 0.3),
             max_tokens=llm_cfg.get("max_tokens", 8000),

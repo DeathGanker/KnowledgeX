@@ -14,6 +14,10 @@ llm:
   temperature: 0.3
   max_tokens: 8000
   timeout_seconds: 120
+  # 深度思考开关（仅火山方舟「思考型」接入点支持）。disabled 最快（实测快约 6 倍）；
+  # enabled/auto 会先输出一大段 reasoning 再答，慢很多。留空则不发送该参数（用端点默认）。
+  # 换非思考模型 / 其它服务商若因该参数报错，把值清空即可。
+  thinking: disabled
   # 是否绕过 macOS 系统代理（Clash/Surge 之类）直接走本地网络。
   # 对国内 LLM 服务（豆包、DeepSeek 等）建议 true，否则可能 403。
   # 用海外端点（OpenAI 官方）请改 false。

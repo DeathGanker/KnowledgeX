@@ -95,6 +95,19 @@ _CONFIG_ENV_OVERRIDES = {
 }
 
 
+_THINKING_TYPES = {"enabled", "disabled", "auto"}
+
+
+def llm_extra_body(llm_cfg: dict) -> dict:
+    """据 config 的 llm.thinking 生成 OpenAI extra_body（火山方舟思考开关）。
+
+    disabled 关思考（最快）；enabled/auto 开。留空/非法值则返回 {}（不发送该参数，
+    用端点默认行为）——换非思考模型 / 其它服务商时清空 thinking 即可避免报错。
+    """
+    mode = str((llm_cfg or {}).get("thinking", "") or "").strip().lower()
+    return {"thinking": {"type": mode}} if mode in _THINKING_TYPES else {}
+
+
 def load_pipeline_config() -> dict:
     """读 config.yaml 并叠加 .env 的端点覆盖（base_url / model / embedding url+model）。
 

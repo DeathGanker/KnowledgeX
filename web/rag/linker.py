@@ -18,7 +18,7 @@ import httpx
 import numpy as np
 from openai import OpenAI
 
-from web.config import PIPELINE_CONFIG, VAULT_ROOT
+from web.config import PIPELINE_CONFIG, VAULT_ROOT, llm_extra_body
 from web.rag import index
 
 
@@ -152,6 +152,7 @@ def generate_reasons(
         try:
             resp = client.chat.completions.create(
                 model=llm_cfg["model"],
+                extra_body=llm_extra_body(llm_cfg),
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.2,
                 max_tokens=600,

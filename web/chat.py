@@ -20,7 +20,7 @@ import httpx
 from openai import OpenAI
 
 from web import files
-from web.config import PIPELINE_CONFIG
+from web.config import PIPELINE_CONFIG, llm_extra_body
 from web.rag import graph, graph_retriever, retriever
 from web.rag import index as rag_index
 from scripts.persona import (
@@ -265,6 +265,7 @@ def stream_chat(question: str, note_path: str, mode: str) -> Generator[str, None
         try:
             stream = client.chat.completions.create(
                 model=llm_cfg["model"],
+                extra_body=llm_extra_body(llm_cfg),
                 messages=messages,
                 tools=round_tools,
                 tool_choice=round_tool_choice,
@@ -498,6 +499,7 @@ def stream_rag_chat(
     try:
         stream = client.chat.completions.create(
             model=llm_cfg["model"],
+            extra_body=llm_extra_body(llm_cfg),
             messages=messages,
             temperature=llm_cfg.get("temperature", 0.3),
             max_tokens=llm_cfg.get("max_tokens", 4000),
@@ -600,6 +602,7 @@ def stream_profile_draft(answers: dict) -> Generator[str, None, None]:
     try:
         stream = client.chat.completions.create(
             model=llm_cfg["model"],
+            extra_body=llm_extra_body(llm_cfg),
             messages=messages,
             temperature=0.4,
             max_tokens=1000,
@@ -720,6 +723,7 @@ def stream_taxonomy_suggest(persona_override: Optional[dict] = None) -> Generato
     try:
         stream = client.chat.completions.create(
             model=llm_cfg["model"],
+            extra_body=llm_extra_body(llm_cfg),
             messages=messages,
             temperature=0.4,
             max_tokens=1500,
@@ -797,6 +801,7 @@ def suggest_placement(note: dict) -> dict:
     try:
         resp = client.chat.completions.create(
             model=llm_cfg["model"],
+            extra_body=llm_extra_body(llm_cfg),
             messages=[
                 {"role": "system", "content": _PLACEMENT_SUGGEST_SYSTEM},
                 {"role": "user", "content": user_input},

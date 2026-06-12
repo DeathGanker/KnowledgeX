@@ -20,6 +20,7 @@ if str(PIPELINE_DIR) not in _sys.path:
     _sys.path.insert(0, str(PIPELINE_DIR))
 from scripts import paths as _paths  # noqa: E402  已在 import 时解析好 VAULT_ROOT
 VAULT_ROOT = _paths.ensure_vault(_paths.VAULT_ROOT)
+llm_extra_body = _paths.llm_extra_body  # 重导出：web 各模块的 LLM 调用透传思考开关
 
 
 def _load_pipeline_config() -> dict:
