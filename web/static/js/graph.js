@@ -175,7 +175,12 @@
 
     if (opts.currentPath) highlight(opts.currentPath);
 
+    // 图例：顶层目录 → 颜色（与节点同款映射）；有孤立点则追加一项
+    const legend = groups.map(g => ({label: g, color: colorOf(g)}));
+    if (nodes.some(n => !n.degree)) legend.push({label: '孤立 · 暂无连接', color: C.mute, faded: true});
+
     return {
+      legend,
       highlight,
       destroy() {
         sim.stop();

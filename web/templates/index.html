@@ -20,7 +20,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.min.css">
-  <link rel="stylesheet" href="/static/css/app.css?v=20260612d">
+  <link rel="stylesheet" href="/static/css/app.css?v=20260612e">
 </head>
 <body class="h-screen overflow-hidden">
 
@@ -106,10 +106,13 @@
     <!-- 中栏：问答主区（主角，内容居中） -->
     <main class="col-chat flex-1 flex flex-col overflow-hidden" style="position:relative">
       <!-- 会话历史侧轨：浮在中间栏左侧空位（不占文件树），仅全库问答显示 -->
-      <aside x-show="chatTab==='vault'" x-transition.opacity class="session-rail hidden xl:flex">
+      <aside x-show="chatTab==='vault' && railOpen" x-transition.opacity class="session-rail hidden lg:flex">
         <div class="session-rail-head">
           <span class="eyebrow">◇ 对话</span>
-          <button @click="newVaultSession()" class="pill pill-sm pill-accent" title="新建一段对话">＋</button>
+          <div class="flex items-center gap-1">
+            <button @click="newVaultSession()" class="pill pill-sm pill-accent" title="新建一段对话">＋</button>
+            <button @click="toggleRail()" class="pill pill-sm" title="收起对话历史">«</button>
+          </div>
         </div>
         <div class="session-list">
           <template x-for="s in vaultSessions" :key="s.session_id">
@@ -123,6 +126,8 @@
           </template>
         </div>
       </aside>
+      <!-- 收起后：左上角浮一个重开按钮 -->
+      <button x-show="chatTab==='vault' && !railOpen" @click="toggleRail()" class="session-reopen hidden lg:flex" title="展开对话历史">☰ 对话</button>
       <!-- 头部 -->
       <div class="hair-b shrink-0">
         <div class="max-w-3xl mx-auto w-full px-5 py-3">
@@ -901,11 +906,23 @@
       <div class="hair-b p-3 flex items-center justify-between shrink-0">
         <span class="eyebrow">◆ 知识图谱 · 全库<span style="color:var(--canvas-mid)"> · <span x-text="graphStatsBig.nodes"></span> 节点 / <span x-text="graphStatsBig.edges"></span> 边</span></span>
         <div class="flex items-center gap-3">
-          <span class="eyebrow hidden md:inline" style="color:var(--mute)">滚轮缩放 · 拖拽平移 · 点节点开笔记</span>
+          <span class="eyebrow hidden md:inline" style="color:var(--mute)">滚轮缩放 · 拖拽平移 · 点节点或名字开笔记</span>
           <button @click="closeGraphBig()" style="color:var(--mute);font-size:20px;line-height:1;background:none;border:none;cursor:pointer">×</button>
         </div>
       </div>
-      <svg id="big-graph" class="graph-svg flex-1"></svg>
+      <div class="graph-stage flex-1">
+        <svg id="big-graph" class="graph-svg"></svg>
+        <!-- 图例：颜色 = 笔记所在顶层目录 -->
+        <div class="graph-legend" x-show="graphLegend.length">
+          <div class="eyebrow mb-1" style="color:var(--mute)">颜色 = 顶层目录</div>
+          <template x-for="(lg, li) in graphLegend" :key="li">
+            <div class="graph-legend-item" :style="lg.faded ? 'opacity:.6' : ''">
+              <span class="graph-legend-dot" :style="'background:' + lg.color"></span>
+              <span x-text="lg.label"></span>
+            </div>
+          </template>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -915,7 +932,7 @@
 <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
-<script src="/static/js/graph.js?v=20260612d"></script>
-<script src="/static/js/app.js?v=20260612d"></script>
+<script src="/static/js/graph.js?v=20260612e"></script>
+<script src="/static/js/app.js?v=20260612e"></script>
 </body>
 </html>

@@ -430,7 +430,7 @@ html, body {
 .graph-label {
   font-family: var(--font-mono);
   font-size: 9px; letter-spacing: 0.2px;
-  pointer-events: none; user-select: none;
+  pointer-events: auto; cursor: pointer; user-select: none;  /* 可点名字开笔记 */
 }
 /* 高亮联动：聚焦当前笔记+邻居，其余淡出 */
 .graph-dim { opacity: 0.16; }
@@ -441,7 +441,26 @@ html, body {
   width: 92vw; height: 88vh; max-width: 1200px; max-height: none;
   padding: 0;
 }
-.graph-modal-panel .graph-svg { flex: 1; }
+.graph-stage { position: relative; min-height: 0; display: flex; }
+.graph-stage .graph-svg { flex: 1; height: 100%; }
+
+/* 图谱图例：浮在大图右下角 */
+.graph-legend {
+  position: absolute; right: 12px; bottom: 12px; z-index: 5;
+  background: var(--canvas-soft); border: 1px solid var(--hairline);
+  border-radius: 8px; padding: 8px 10px; max-width: 220px; max-height: 50%; overflow-y: auto;
+}
+.graph-legend-item { display: flex; align-items: center; gap: 7px; font-size: 11px; color: var(--body); padding: 1px 0; }
+.graph-legend-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+
+/* 会话轨收起后的重开按钮（浮在中间栏左上角空位） */
+.session-reopen {
+  position: absolute; left: 10px; top: 56px; z-index: 5;
+  align-items: center; gap: 4px; padding: 4px 9px;
+  font-size: 11px; color: var(--mute);
+  background: var(--canvas-soft); border: 1px solid var(--hairline); border-radius: 7px; cursor: pointer;
+}
+.session-reopen:hover { color: var(--ink); border-color: var(--accent-sunset); }
 
 /* ---------- 召回 / 引用透明化 ---------- */
 /* 来源 chip 的编号徽标 */
@@ -483,7 +502,7 @@ html, body {
 .recall-graph-tag { font-size: 10px; color: var(--accent-breeze); border: 1px solid var(--accent-breeze); border-radius: 4px; padding: 0 5px; white-space: nowrap; flex-shrink: 0; }
 
 /* 会话历史侧轨（中间栏左侧空位，仅宽屏 xl 显示） */
-.session-rail { position: absolute; left: 10px; top: 56px; bottom: 12px; width: 190px;
+.session-rail { position: absolute; left: 10px; top: 56px; bottom: 12px; width: 172px;
   flex-direction: column; background: var(--canvas-soft); border: 1px solid var(--hairline);
   border-radius: 10px; overflow: hidden; z-index: 5; }
 .session-rail-head { display: flex; align-items: center; justify-content: space-between;

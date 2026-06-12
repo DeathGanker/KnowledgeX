@@ -102,6 +102,8 @@ function vaultApp() {
     // 知识图谱
     graphBigOpen: false,
     graphStatsBig: {nodes: '-', edges: '-'},
+    graphLegend: [],         // 大图图例：[{label,color,faded?}]
+    railOpen: true,          // 会话历史轨是否展开（可收缩，记忆到 localStorage）
     _miniGraphCtl: null,
     _bigGraphCtl: null,
 
@@ -127,6 +129,13 @@ function vaultApp() {
       // auto 模式下跟随系统切换
       const mq = window.matchMedia('(prefers-color-scheme: dark)');
       mq.addEventListener('change', () => { if (this.themePref === 'auto') this.applyTheme(); });
+      // 会话轨展开/收缩记忆
+      this.railOpen = localStorage.getItem('kx_rail_collapsed') !== '1';
+    },
+
+    toggleRail() {
+      this.railOpen = !this.railOpen;
+      localStorage.setItem('kx_rail_collapsed', this.railOpen ? '0' : '1');
     },
 
     applyTheme() {
@@ -1538,6 +1547,7 @@ function vaultApp() {
           currentPath: this.currentNote ? this.currentNote.path : null,
           onSelect: (path) => { this.openNote(path); },
         });
+        this.graphLegend = this._bigGraphCtl.legend || [];
       } catch (e) {
         console.error('大图加载失败', e);
         this.showNotice({title: '图谱加载失败', body: this.escapeHtml(e.message), kind: 'danger'});
