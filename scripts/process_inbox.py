@@ -131,11 +131,11 @@ def run(dry_run: bool = False, no_llm: bool = False, only: str | None = None) ->
             items_state, key,
             url=it.target, source_file=it.source_file, fetcher=it.fetcher,
             raw_line=it.raw_line, status="staged", title=result.title,
-            fetched_at=now_iso(), staging_path=str(staging_path.relative_to(VAULT_ROOT)),
+            fetched_at=now_iso(), staging_path=str(staging_path.relative_to(PIPELINE_DIR)),
             error=None,
         )
         save_state(items_state)
-        logger.info(f"  ✓ 已抓取 → {staging_path.relative_to(VAULT_ROOT)}")
+        logger.info(f"  ✓ 已抓取 → {staging_path.relative_to(PIPELINE_DIR)}")
 
         if no_llm:
             logger.info("  --no-llm 模式，跳过消化和归位")

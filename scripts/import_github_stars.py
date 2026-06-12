@@ -210,7 +210,7 @@ def process_one(
         url=url, source_file="github-stars-import", fetcher="github",
         raw_line=url, status="staged", title=result.title,
         fetched_at=now_iso(),
-        staging_path=str(staging_path.relative_to(VAULT_ROOT)),
+        staging_path=str(staging_path.relative_to(PIPELINE_DIR)),
         error=None,
     )
     save_state(items_state)
