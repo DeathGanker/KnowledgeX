@@ -1,0 +1,14 @@
+{
+  "name": "knowledge-desktop",
+  "private": true,
+  "version": "0.1.0",
+  "description": "个人知识助手 桌面端（Tauri 壳，复用 FastAPI 后端）",
+  "scripts": {
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.1.0"
+  }
+}

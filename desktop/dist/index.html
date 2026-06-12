@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<!--
+  仅用于满足 Tauri 的 frontendDist 配置（`tauri build` 时需要）。
+  `npm run tauri:dev` 走的是 devUrl（http://127.0.0.1:7346 由 FastAPI 后端提供），
+  不会用到本文件。若将来要做 `tauri build` 打包，需要把后端做成 sidecar 随应用启动，
+  这里仅作占位 + 兜底跳转。
+-->
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>个人知识助手</title>
+  <meta http-equiv="refresh" content="0; url=http://127.0.0.1:7346">
+  <style>
+    body { font-family: -apple-system, system-ui, sans-serif; background:#0a0a0a; color:#dadbdf;
+           height:100vh; margin:0; display:flex; align-items:center; justify-content:center; }
+  </style>
+</head>
+<body>
+  <p>正在连接本地后端 <code>http://127.0.0.1:7346</code> …</p>
+</body>
+</html>

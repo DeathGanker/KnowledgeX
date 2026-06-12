@@ -1,0 +1,9 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "本地桌面端默认权限",
+  "windows": ["main"],
+  "permissions": [
+    "core:default"
+  ]
+}

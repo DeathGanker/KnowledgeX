@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>授权 · Knowledge Base</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="128x128" href="/static/icons/favicon-128.png">
+  <link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body class="h-screen flex items-center justify-center">
+  <div class="card fade-in" style="max-width:420px;margin:0 16px">
+    <div class="flex items-center gap-3 mb-4">
+      <img src="/static/icons/favicon-128.png" alt="个人知识助手" width="44" height="44"
+           style="border-radius:11px;box-shadow:0 2px 10px rgba(0,0,0,.5);flex-shrink:0">
+      <div class="leading-tight">
+        <div style="font-size:15px;color:var(--ink)">个人知识助手</div>
+        <div class="eyebrow" style="margin-top:2px">KNOWLEDGE&nbsp;BASE</div>
+      </div>
+    </div>
+    <div class="eyebrow mb-3">◆ ACCESS&nbsp;REQUIRED</div>
+    <h1 style="font-size:24px;font-weight:400;letter-spacing:-0.6px;margin:0 0 12px">需要授权</h1>
+    <p style="color:var(--body);font-size:14px;line-height:1.7">
+      请使用启动脚本生成的 URL（带 <code style="font-family:var(--font-mono);background:var(--canvas-soft);padding:1px 6px;border-radius:5px;color:var(--accent-sunset-soft)">?token=</code> 参数）进入。
+      首次进入后 token 写入 Cookie，之后访问无需再带。
+    </p>
+    <div class="mt-4 p-3" style="background:var(--canvas-soft);border-left:2px solid var(--accent-sunset);border-radius:6px">
+      <p class="eyebrow mb-1">找不到 TOKEN？</p>
+      <p style="color:var(--mute);font-size:13px;line-height:1.6;margin:0">
+        查看 <code style="font-family:var(--font-mono);color:var(--body)">.pipeline/.env</code> 的 <code style="font-family:var(--font-mono);color:var(--body)">WEB_TOKEN</code>，或复制启动脚本输出的完整 URL。
+      </p>
+    </div>
+  </div>
+</body>
+</html>

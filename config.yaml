@@ -1,0 +1,87 @@
+# 收件箱处理管道配置
+# 修改本文件后无需重启，下一次运行 process_inbox.py 即生效
+
+llm:
+  # OpenAI 兼容端点。常用：
+  #   DeepSeek: https://api.deepseek.com/v1
+  #   Doubao:   https://ark.cn-beijing.volces.com/api/v3
+  # 注意：base_url 只写到 /v3（或 /v1），不带 /chat/completions 或 /responses，
+  # OpenAI SDK 会自动补足路径。
+  # base_url / model 均可被 .env 覆盖（LLM_BASE_URL / LLM_MODEL），优先级 .env > 本文件。
+  base_url: https://ark.cn-beijing.volces.com/api/v3
+  api_key_env: ARK_API_KEY                # 仅写变量名；真实密钥放 .env 文件
+  model: your-llm-endpoint-id             # 账号专属接入点 ID/模型名；请在 .env 设 LLM_MODEL（或改这里）
+  temperature: 0.3
+  max_tokens: 8000
+  timeout_seconds: 120
+  # 是否绕过 macOS 系统代理（Clash/Surge 之类）直接走本地网络。
+  # 对国内 LLM 服务（豆包、DeepSeek 等）建议 true，否则可能 403。
+  # 用海外端点（OpenAI 官方）请改 false。
+  bypass_system_proxy: true
+
+# DeepWiki MCP —— 笔记问答里「DeepWiki 源码」模式调用的海外服务。
+# ⚠️ 与上面的国内 LLM 正好相反：DeepWiki 在 mcp.deepwiki.com（海外），
+#    从国内访问通常必须走代理，否则连接超时 → 工具调用失败 → 回答降级。
+deepwiki:
+  endpoint: https://mcp.deepwiki.com/mcp
+  timeout_seconds: 90
+  # 代理：默认走 .env 的 HTTPS_PROXY（桌面端/浏览器端共用一处，是推荐的统一入口）。
+  # 这里留 null 即可；仅当你想给 DeepWiki 单独指定一个不同于 HTTPS_PROXY 的代理时才填。
+  # 提醒：显式连 Clash 本地端口即可，不依赖 macOS「系统代理」开关，也不要用 TUN
+  #（TUN 会把国内豆包 LLM 也带进代理 → 可能 403）。
+  proxy: null
+
+# RAG 跨笔记问答的 embedding 配置（豆包多模态 embedding，2048 维，单条调用）
+# url / model 均可被 .env 覆盖（EMBEDDING_URL / EMBEDDING_MODEL），优先级 .env > 本文件。
+embedding:
+  url: https://ark.cn-beijing.volces.com/api/v3/embeddings/multimodal
+  model: your-embedding-endpoint-id       # 账号专属接入点 ID；请在 .env 设 EMBEDDING_MODEL（或改这里）
+  api_key_env: ARK_API_KEY
+  dimension: 2048
+  bypass_system_proxy: true
+  concurrency: 8                           # 索引时并发请求数
+  # 索引哪些目录（vault 根的相对路径前缀）
+  index_dirs:
+    - 01-笔记
+    - 02-领域
+    - 03-资源
+  chunk_max_chars: 800                     # 单块最大字符，超长章节再切
+
+# 抓取器开关
+fetchers:
+  github: true
+  wechat: true
+  webpage: true
+  pdf: true
+  docx: true
+  douyin: false                          # 首版关闭，需要 whisper
+
+# ⚠️ 归位目录的单一来源已迁移到 profile.yaml 的 taxonomy 段
+#    （在 Web 端「画像 → 目录体系」维护，支持 AI 推荐；消化/问答实时读取）。
+# 下面 allowed_placement_prefixes / default_placement 仅作 profile.yaml 缺 taxonomy 段时的安全回退，
+# 平时不生效——改目录体系请改 profile.yaml，不要改这里。
+allowed_placement_prefixes:
+  - 02-领域/Agent与框架     # Agent harness、workflow、orchestration、Agent 产品
+  - 02-领域/模型与RAG       # LLM、推理引擎、向量库、知识图谱、记忆系统
+  - 02-领域/工具与集成      # MCP、CLI、IDE 增强、function-call、自动化
+  - 02-领域/前端与交付      # Web UI、可视化、设计系统、FDE 交付层
+  - 02-领域/工程实践        # 部署、监控、性能、Prompt 工程、技术选型
+  - 02-领域/行业落地        # 垂直行业 AI 案例、客户场景
+  - 02-领域/产品与方法      # 产品设计、用户研究、FDE 方法论
+  - 02-领域/思考与洞察      # 趋势、感悟、长文随笔
+  - 01-笔记/文献            # 兜底：短小、未达领域知识深度
+  - 01-笔记/永久            # 反复提炼后的核心观点（手工为主）
+  - 03-资源/工具            # 纯查询备忘
+
+default_placement: 01-笔记/文献
+
+# 收件箱根目录（vault 根的相对路径）
+inbox_dir: 00-收件箱
+
+# 抓取限制
+limits:
+  github_readme_max_chars: 40000
+  webpage_max_chars: 30000
+  pdf_max_pages: 30
+  http_timeout_seconds: 30
+  user_agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15

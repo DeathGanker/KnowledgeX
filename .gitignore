@@ -1,0 +1,44 @@
+# ============================================================
+# KnowledgeX .gitignore（开源版）
+# 原则：只提交代码与模板；密钥、个人数据、可再生缓存都不入库。
+# ============================================================
+
+# ---------- 构建产物 / 依赖 ----------
+.venv/
+__pycache__/
+*.pyc
+node_modules/
+desktop/src-tauri/target/
+desktop/src-tauri/gen/
+.gstack/
+.codegraph/
+.DS_Store
+**/.DS_Store
+
+# ---------- 密钥与本地配置 ----------
+# 真实密钥放 .env（含 API Key），切勿提交；参照 .env.example 复制。
+.env
+# 个人画像：仓库只提交 profile.yaml.example；用户首次运行经「画像」引导生成自己的 profile.yaml
+profile.yaml
+
+# ---------- 个人数据 / 可再生缓存（每台机器各自生成） ----------
+# 抓取的原始素材缓存，删了重跑 process_inbox 即可再生
+staging/
+# 向量索引，可由笔记重建
+rag_index/
+# 对话历史
+conversations/
+# 运行日志
+logs/
+# 收件箱处理状态
+state.json
+# 备份文件（如 profile.yaml.bak）
+*.bak
+
+# ---------- 本地工具设置 ----------
+.claude/settings.local.json
+
+# ---------- 不开源的内部文档（开发记录 / 汇报 / 竞品分析，含本地路径与个人数据） ----------
+OpenWiki-vs-Pipeline-全面分析报告.md
+todo.md
+产品汇报-个人知识助手.md
