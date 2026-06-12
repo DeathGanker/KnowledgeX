@@ -20,7 +20,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.min.css">
-  <link rel="stylesheet" href="/static/css/app.css?v=20260612c">
+  <link rel="stylesheet" href="/static/css/app.css?v=20260612d">
 </head>
 <body class="h-screen overflow-hidden">
 
@@ -104,7 +104,25 @@
     <div class="splitter hidden md:block" @mousedown="startResize('tree', $event)" title="拖动调整文件树宽度"></div>
 
     <!-- 中栏：问答主区（主角，内容居中） -->
-    <main class="col-chat flex-1 flex flex-col overflow-hidden">
+    <main class="col-chat flex-1 flex flex-col overflow-hidden" style="position:relative">
+      <!-- 会话历史侧轨：浮在中间栏左侧空位（不占文件树），仅全库问答显示 -->
+      <aside x-show="chatTab==='vault'" x-transition.opacity class="session-rail hidden xl:flex">
+        <div class="session-rail-head">
+          <span class="eyebrow">◇ 对话</span>
+          <button @click="newVaultSession()" class="pill pill-sm pill-accent" title="新建一段对话">＋</button>
+        </div>
+        <div class="session-list">
+          <template x-for="s in vaultSessions" :key="s.session_id">
+            <div class="session-item" :class="s.session_id===vaultSessionId ? 'active' : ''" @click="switchVaultSession(s.session_id)">
+              <span class="session-title" x-text="s.title || '新对话'"></span>
+              <button class="session-del" @click.stop="deleteVaultSession(s.session_id)" title="删除这段对话">×</button>
+            </div>
+          </template>
+          <template x-if="!vaultSessions.length">
+            <div class="eyebrow" style="padding:8px;color:var(--canvas-mid)">还没有对话</div>
+          </template>
+        </div>
+      </aside>
       <!-- 头部 -->
       <div class="hair-b shrink-0">
         <div class="max-w-3xl mx-auto w-full px-5 py-3">
@@ -897,7 +915,7 @@
 <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
-<script src="/static/js/graph.js?v=20260612c"></script>
-<script src="/static/js/app.js?v=20260612c"></script>
+<script src="/static/js/graph.js?v=20260612d"></script>
+<script src="/static/js/app.js?v=20260612d"></script>
 </body>
 </html>

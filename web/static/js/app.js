@@ -18,6 +18,8 @@ function vaultApp() {
     messages: [],            // 当前 tab 的对话（引用 _noteMsgs 或 _vaultMsgs）
     _noteMsgs: [],
     _vaultMsgs: [],
+    vaultSessions: [],       // 全库问答的多会话列表 [{session_id,title,updated_at,count}]
+    vaultSessionId: null,    // 当前全库问答会话 id
     _vaultLoaded: false,     // vault 会话是否已从磁盘惰性加载过
     input: '',
     streaming: false,
@@ -273,18 +275,89 @@ function vaultApp() {
       else if (tab === 'vault') {
         this.messages = this._vaultMsgs;
         this.loadRagStatus();
-        if (!this._vaultLoaded) this._loadConversation('vault', null);  // 首切惰性加载持久会话
+        if (!this._vaultLoaded) { this._vaultLoaded = true; this.loadVaultSessions(); }  // 首切加载会话列表
       }
       else if (tab === 'plan') { this.planHtml = ''; this.planMeta = {title:'',summary:''}; this.planInput = ''; }
     },
 
     // ----------------- 对话持久化 -----------------
 
-    // 当前上下文的会话 key：vault→全局；note 且有笔记→该笔记；否则不持久化（plan/无笔记）
+    // 当前上下文的会话 key：vault→当前会话；note 且有笔记→该笔记；否则不持久化（plan 见 Stage2/无笔记）
     _convKey() {
-      if (this.chatTab === 'vault') return {kind: 'vault', note_path: null};
-      if (this.chatTab === 'note' && this.currentNote) return {kind: 'note', note_path: this.currentNote.path};
+      if (this.chatTab === 'vault') return this.vaultSessionId ? {kind: 'vault', session_id: this.vaultSessionId, note_path: null} : null;
+      if (this.chatTab === 'note' && this.currentNote) return {kind: 'note', note_path: this.currentNote.path, session_id: null};
       return null;
+    },
+
+    _genId() {
+      return (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : ('s-' + Date.now() + '-' + Math.floor(Math.random() * 1e6));
+    },
+
+    // ---- 全库问答多会话 ----
+    async loadVaultSessions(selectId) {
+      try {
+        const r = await fetch('/api/conversations?kind=vault');
+        if (r.ok) this.vaultSessions = (await r.json()).sessions || [];
+      } catch (e) { this.vaultSessions = []; }
+      const ids = this.vaultSessions.map(s => s.session_id);
+      let target = selectId || this.vaultSessionId;
+      if (!target || !ids.includes(target)) target = ids[0] || null;
+      if (target) await this.switchVaultSession(target, true);
+      else this.newVaultSession();
+    },
+
+    async switchVaultSession(id, skipSave) {
+      if (id === this.vaultSessionId && skipSave !== true) return;
+      // 先存当前会话（若有内容）
+      if (!skipSave && this.vaultSessionId && this.chatTab === 'vault' && this.messages.length) {
+        this._persistConversation({kind: 'vault', session_id: this.vaultSessionId}, this.messages);
+      }
+      this.vaultSessionId = id;
+      try {
+        const r = await fetch('/api/conversation?kind=vault&session_id=' + encodeURIComponent(id));
+        const msgs = r.ok ? ((await r.json()).messages || []) : [];
+        this._vaultMsgs = msgs;
+        if (this.chatTab === 'vault') this.messages = msgs;
+      } catch (e) {
+        this._vaultMsgs = []; if (this.chatTab === 'vault') this.messages = [];
+      }
+    },
+
+    newVaultSession() {
+      if (this.vaultSessionId && this.chatTab === 'vault' && this.messages.length) {
+        this._persistConversation({kind: 'vault', session_id: this.vaultSessionId}, this.messages);
+      }
+      const id = this._genId();
+      this.vaultSessionId = id;
+      const fresh = [];                       // messages 与 _vaultMsgs 必须同一引用，否则切走丢对话
+      this._vaultMsgs = fresh;
+      if (this.chatTab === 'vault') this.messages = fresh;
+      // 乐观加入列表头；空会话不落盘，首次发消息时 _persistConversation 才写
+      this.vaultSessions = [{session_id: id, title: '新对话', updated_at: null, count: 0},
+                            ...this.vaultSessions.filter(s => s.session_id !== id)];
+    },
+
+    async deleteVaultSession(id) {
+      const ok = await this.askConfirm({title: '删除对话', body: '将删除这段对话记录，不可恢复。', confirmText: '删除', danger: true});
+      if (!ok) return;
+      try {
+        await fetch('/api/conversation/clear', {method: 'POST', headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({kind: 'vault', session_id: id})});
+      } catch (e) { /* 忽略 */ }
+      this.vaultSessions = this.vaultSessions.filter(s => s.session_id !== id);
+      if (this.vaultSessionId === id) {
+        const next = this.vaultSessions[0];
+        if (next) await this.switchVaultSession(next.session_id, true);
+        else this.newVaultSession();
+      }
+    },
+
+    // 发消息后更新会话列表里这条的标题/条数，并置顶
+    _refreshVaultSessionMeta(id, msgs) {
+      const title = ((msgs.find(m => m.role === 'user') || {}).text || '新对话').replace(/\s+/g, ' ').trim().slice(0, 40);
+      const s = this.vaultSessions.find(x => x.session_id === id) || {session_id: id};
+      s.title = title; s.count = msgs.length;
+      this.vaultSessions = [s, ...this.vaultSessions.filter(x => x.session_id !== id)];
     },
 
     // 惰性拉某上下文的持久会话；回填前校验上下文未变（防快速切换错位）
@@ -317,8 +390,8 @@ function vaultApp() {
       msgs = msgs || this.messages;
       fetch('/api/conversation/save', {
         method: 'POST', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({kind: key.kind, note_path: key.note_path, messages: msgs}),
-      }).catch(() => {});
+        body: JSON.stringify({kind: key.kind, note_path: key.note_path || null, session_id: key.session_id || null, messages: msgs}),
+      }).then(() => { if (key.kind === 'vault' && key.session_id) this._refreshVaultSessionMeta(key.session_id, msgs); }).catch(() => {});
     },
 
     async clearConversation() {
@@ -332,11 +405,18 @@ function vaultApp() {
       try {
         await fetch('/api/conversation/clear', {
           method: 'POST', headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({kind: key.kind, note_path: key.note_path}),
+          body: JSON.stringify({kind: key.kind, note_path: key.note_path || null, session_id: key.session_id || null}),
         });
       } catch (e) { /* 忽略，前端照样清空 */ }
       this.messages = [];
-      if (key.kind === 'note') this._noteMsgs = []; else this._vaultMsgs = [];
+      if (key.kind === 'note') { this._noteMsgs = []; }
+      else if (key.kind === 'vault') {
+        // 清空 = 删除当前会话，切到剩余最近的或新建
+        this.vaultSessions = this.vaultSessions.filter(s => s.session_id !== key.session_id);
+        const next = this.vaultSessions[0];
+        if (next) await this.switchVaultSession(next.session_id, true);
+        else this.newVaultSession();
+      }
     },
 
     async exportConversation() {

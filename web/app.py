@@ -579,25 +579,40 @@ def api_note_save(req: NoteSaveRequest) -> JSONResponse:
 # ---------------- 对话记录持久化 ----------------
 
 class ConvSaveRequest(BaseModel):
-    kind: str                        # note | vault
+    kind: str                        # note | vault | plan
     note_path: str | None = None
+    session_id: str | None = None    # vault/plan 多会话用
     messages: list[dict] = []
 
 
 class ConvKeyRequest(BaseModel):
     kind: str
     note_path: str | None = None
+    session_id: str | None = None
+
+
+@app.get("/api/conversations")
+def api_conversations_list(
+    kind: str = Query(..., description="vault | plan"),
+) -> JSONResponse:
+    """列出某多会话 tab 的全部会话（标题/时间/条数，按更新倒序）。"""
+    from web import conversations
+    try:
+        return JSONResponse({"sessions": conversations.list_sessions(kind)})
+    except ValueError as e:
+        raise HTTPException(400, str(e))
 
 
 @app.get("/api/conversation")
 def api_conversation_get(
-    kind: str = Query(..., description="note | vault"),
+    kind: str = Query(..., description="note | vault | plan"),
     note_path: str | None = Query(None),
+    session_id: str | None = Query(None),
 ) -> JSONResponse:
-    """读取某上下文的滚动会话（缺失返回空）。"""
+    """读取某上下文/某会话（缺失返回空）。"""
     from web import conversations
     try:
-        return JSONResponse(conversations.load_conversation(kind, note_path))
+        return JSONResponse(conversations.load_conversation(kind, note_path, session_id))
     except ValueError as e:
         raise HTTPException(400, str(e))
 
@@ -607,17 +622,18 @@ def api_conversation_save(req: ConvSaveRequest) -> JSONResponse:
     """整条会话覆盖写。"""
     from web import conversations
     try:
-        return JSONResponse(conversations.save_conversation(req.kind, req.note_path, req.messages))
+        return JSONResponse(conversations.save_conversation(
+            req.kind, req.note_path, req.messages, req.session_id))
     except ValueError as e:
         raise HTTPException(400, str(e))
 
 
 @app.post("/api/conversation/clear")
 def api_conversation_clear(req: ConvKeyRequest) -> JSONResponse:
-    """清空对话：删除磁盘文件。"""
+    """清空/删除一段对话：删除磁盘文件。"""
     from web import conversations
     try:
-        return JSONResponse(conversations.delete_conversation(req.kind, req.note_path))
+        return JSONResponse(conversations.delete_conversation(req.kind, req.note_path, req.session_id))
     except ValueError as e:
         raise HTTPException(400, str(e))
 
