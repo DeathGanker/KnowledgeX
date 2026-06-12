@@ -1240,8 +1240,12 @@ function vaultApp() {
       const a = this.messages[assistantIdx];
       const q = this._findUserQuestion(assistantIdx);
       if (!q) return;
-      const titles = (a && a.sources ? a.sources : []).map(s => s.note_title).filter(Boolean);
-      this.gapModal = {open: true, loading: true, filling: false, candidates: [], progress: [], created: [], question: q};
+      const srcs = (a && a.sources) ? a.sources : [];
+      const titles = srcs.map(s => s.note_title).filter(Boolean);
+      // 被「引用」的笔记路径 → 缺口笔记归位后与之建关联边（问答即生长的延伸）
+      const cited = (a && a.cited) ? a.cited : [];
+      const originPaths = srcs.filter(s => cited.includes(s.n)).map(s => s.note_path).filter(Boolean);
+      this.gapModal = {open: true, loading: true, filling: false, candidates: [], progress: [], created: [], question: q, originPaths};
       try {
         const r = await fetch('/api/gap/suggest', {
           method: 'POST', headers: {'Content-Type': 'application/json'},
@@ -1265,7 +1269,7 @@ function vaultApp() {
       try {
         const r = await fetch('/api/gap/fill', {
           method: 'POST', headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({repos, question: this.gapModal.question || ''}),
+          body: JSON.stringify({repos, question: this.gapModal.question || '', origin_paths: this.gapModal.originPaths || []}),
         });
         if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || `HTTP ${r.status}`);
         const data = await r.json();

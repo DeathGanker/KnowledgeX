@@ -46,6 +46,64 @@ def save(g: dict) -> None:
     tmp.replace(GRAPH_FILE)
 
 
+# ---- 缺口补全溯源：缺口笔记 ← 触发它的问答所引用的笔记 ----
+# 「问答即生长」延伸：补缺口时登记来源；缺口链接归位成笔记后，把新笔记连到来源笔记
+# （以及同批缺口笔记彼此互连），让新节点一出生就并入图谱、解决冷启动。
+GAP_PROV_FILE = PIPELINE_DIR / "rag_index" / "gap_provenance.json"
+
+
+def _load_gap_prov() -> dict:
+    if GAP_PROV_FILE.exists():
+        try:
+            return json.loads(GAP_PROV_FILE.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            pass
+    return {}
+
+
+def _save_gap_prov(p: dict) -> None:
+    GAP_PROV_FILE.parent.mkdir(exist_ok=True)
+    tmp = GAP_PROV_FILE.with_suffix(".gap.tmp")
+    tmp.write_text(json.dumps(p, ensure_ascii=False, indent=1), encoding="utf-8")
+    tmp.replace(GAP_PROV_FILE)
+
+
+def record_gap_provenance(gap_file: str, question: str, origin_paths: list[str]) -> None:
+    """补缺口时登记：收件箱缺口文件 ← 哪次问答（question）引用的哪些笔记（origin_paths）。"""
+    if not gap_file:
+        return
+    prov = _load_gap_prov()
+    prov[gap_file] = {
+        "question": (question or "")[:120],
+        "origin_paths": sorted({p for p in (origin_paths or []) if p}),
+    }
+    _save_gap_prov(prov)
+
+
+def apply_gap_links(processed_by_file: dict) -> int:
+    """归位后调用（process_inbox 末尾）：对每个有溯源的缺口文件，把它产出的笔记 +
+    来源笔记两两建边（缺口↔来源、缺口↔缺口），渲染双链，再清掉该溯源。返回触及的边数。
+
+    processed_by_file: {收件箱文件相对路径: [已归位笔记相对路径, ...]}
+    """
+    prov = _load_gap_prov()
+    if not prov:
+        return 0
+    touched = 0
+    for gap_file, meta in list(prov.items()):
+        outs = [p for p in (processed_by_file.get(gap_file) or []) if p]
+        if not outs:
+            continue  # 这批还没归位（可能下次运行才处理），留着溯源
+        combined = sorted(set(outs) | set(meta.get("origin_paths") or []))
+        if len(combined) >= 2:
+            res = add_cooccurrence(combined, meta.get("question", ""))
+            render_to_notes(res["affected_paths"])
+            touched += len(res["new_edges"]) + len(res["strengthened"])
+        del prov[gap_file]  # 一次性建边，避免重跑重复加权
+    _save_gap_prov(prov)
+    return touched
+
+
 def add_cooccurrence(paths: list[str], question: str) -> dict:
     """对一组共现笔记两两建边/加权。返回 {new_edges, strengthened, affected_paths}。"""
     uniq = sorted(set(p for p in paths if p))

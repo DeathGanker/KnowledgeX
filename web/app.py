@@ -380,13 +380,14 @@ def api_gap_suggest(req: GapSuggestRequest) -> JSONResponse:
 class GapFillRequest(BaseModel):
     repos: list[dict]
     question: str = ""   # 触发缺口补全的问答，用于命名收件箱文件
+    origin_paths: list[str] = []   # 该问答里被引用的笔记路径 → 缺口笔记归位后与之建关联边
 
 
 @app.post("/api/gap/fill")
 def api_gap_fill(req: GapFillRequest) -> JSONResponse:
     """把选中仓库的链接写进收件箱，之后「处理收件箱」异步消化（避免同步阻塞）。"""
     from web import gapfill
-    return JSONResponse(gapfill.collect_to_inbox(req.repos, req.question))
+    return JSONResponse(gapfill.collect_to_inbox(req.repos, req.question, req.origin_paths))
 
 
 # ---------------- 方案规划（HTML 结构化输出） ----------------

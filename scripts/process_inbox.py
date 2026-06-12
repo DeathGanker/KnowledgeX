@@ -179,6 +179,20 @@ def run(dry_run: bool = False, no_llm: bool = False, only: str | None = None) ->
 
     # 阶段 4: cleanup
     apply_cleanup(VAULT_ROOT, items_state)
+
+    # 阶段 5: 缺口补全关联 —— 把这次归位的「缺口补全」笔记连到触发它的问答引用的笔记
+    processed_by_file: dict[str, list[str]] = {}
+    for rec in items_state.values():
+        if rec.status == "processed" and rec.source_file and rec.output_path:
+            processed_by_file.setdefault(rec.source_file, []).append(rec.output_path)
+    try:
+        from web.rag import graph  # 轻量（json+pathlib），延迟导入避免 CLI 顶层耦合 web
+        touched = graph.apply_gap_links(processed_by_file)
+        if touched:
+            logger.info(f"  🔗 缺口笔记并入图谱：{touched} 条关联边")
+    except Exception as e:
+        logger.warning(f"  (缺口关联跳过：{e})")
+
     logger.info(f"完成。processed={processed}, failed={failed}, skipped={skipped}")
     return 0
 

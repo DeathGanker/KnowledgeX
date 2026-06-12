@@ -135,7 +135,7 @@ def suggest_gaps(question: str, recalled_titles: list[str] | None = None) -> lis
     return candidates
 
 
-def collect_to_inbox(repos: list[dict], question: str = "") -> dict:
+def collect_to_inbox(repos: list[dict], question: str = "", origin_paths: Optional[list] = None) -> dict:
     """把选中的仓库链接写进收件箱的一个 .md 文件，下次「处理收件箱」即抓取消化归位。
 
     文件名取自触发它的问答内容（而非固定名），便于在收件箱里辨认是哪次缺口补的。
@@ -179,9 +179,17 @@ def collect_to_inbox(repos: list[dict], question: str = "") -> dict:
         target = inbox_path / f"{base}-{n}.md"
         n += 1
     target.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    rel = str(target.relative_to(VAULT_ROOT))
+
+    # 登记溯源：归位后由 graph.apply_gap_links 把新笔记连到这次问答引用的笔记
+    try:
+        from web.rag import graph
+        graph.record_gap_provenance(rel, question, origin_paths or [])
+    except Exception:
+        pass  # 溯源失败不影响补缺口主流程
 
     return {
         "written": len(written),
-        "file": str(target.relative_to(VAULT_ROOT)),
+        "file": rel,
         "repos": written,
     }
