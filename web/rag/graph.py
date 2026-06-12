@@ -380,7 +380,8 @@ def export_graph(scope: str = "connected") -> dict:
         {
             "id": p,
             "label": _graph_label(p),
-            "group": p.split("/", 1)[0] if "/" in p else "",
+            # group = 笔记所在目录（即用户 taxonomy 构建的归位目录，动态，不写死）
+            "group": "/".join(p.split("/")[:-1]),
             "degree": degree.get(p, 0),
         }
         for p in sorted(node_ids)

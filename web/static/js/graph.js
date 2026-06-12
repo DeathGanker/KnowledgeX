@@ -7,16 +7,6 @@
  * 颜色全部读自 :root 的 CSS 变量，主题切换时由调用方重新 render 即可自动适配。
  */
 (function () {
-  // 顶层目录 → accent 调色板（孤立点用 mute）
-  const GROUP_VARS = [
-    '--accent-sunset',
-    '--accent-breeze',
-    '--accent-dusk',
-    '--accent-twilight',
-    '--accent-sunset-soft',
-    '--accent-breeze',
-  ];
-
   function cssVar(name, fallback) {
     const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
     return v || fallback || '#888';
@@ -42,11 +32,15 @@
       sunset: cssVar('--accent-sunset', '#ff7a17'),
       canvas: cssVar('--canvas', '#0a0a0a'),
     };
-    const groups = Array.from(new Set(data.nodes.map(n => n.group).filter(Boolean)));
+    // 分组 = 笔记所在目录（用户 taxonomy 动态决定，组数不定）。
+    // 用均匀分布的 HSL 给每个目录一个稳定且互不相同的颜色（起点贴近品牌 sunset 色相）。
+    const groups = Array.from(new Set(data.nodes.map(n => n.group).filter(Boolean))).sort();
     const colorOf = (g) => {
-      if (!g) return C.mute;
+      if (!g) return C.mute;  // 顶层散落（无目录）/孤立 → 灰
       const i = groups.indexOf(g);
-      return cssVar(GROUP_VARS[i % GROUP_VARS.length], C.mute);
+      if (i < 0) return C.mute;
+      const hue = Math.round((25 + i * 360 / Math.max(groups.length, 1)) % 360);
+      return `hsl(${hue}, 55%, 60%)`;
     };
 
     // 容器尺寸
