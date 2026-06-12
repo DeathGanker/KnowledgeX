@@ -6,6 +6,7 @@ process_inbox 的 logger 带 StreamHandler，子进程 stdout 即逐行日志。
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import sys
 from datetime import date, datetime
@@ -15,6 +16,35 @@ from web.config import PIPELINE_CONFIG, PIPELINE_DIR, VAULT_ROOT
 
 
 SCRIPT = PIPELINE_DIR / "scripts" / "process_inbox.py"
+
+# 可上传的本地文件类型（管道现有 pdf/docx fetcher 能抽取消化；图片/扫描件待 Phase 2 视觉模型）
+_UPLOAD_EXTS = {".pdf", ".doc", ".docx"}
+_UPLOAD_MAX_BYTES = 30 * 1024 * 1024  # 30MB
+
+
+def save_uploaded_to_inbox(filename: str, data: bytes) -> dict:
+    """把上传的本地文件存进收件箱目录，之后「处理收件箱」由 pdf/docx fetcher 抽取 → 消化 → 归位。"""
+    name = (filename or "").strip()
+    ext = ("." + name.rsplit(".", 1)[-1].lower()) if "." in name else ""
+    if ext not in _UPLOAD_EXTS:
+        raise ValueError(f"暂不支持的文件类型：{ext or '无扩展名'}（当前支持 PDF / Word）")
+    if not data:
+        raise ValueError("文件为空")
+    if len(data) > _UPLOAD_MAX_BYTES:
+        raise ValueError(f"文件过大（>{_UPLOAD_MAX_BYTES // 1024 // 1024}MB）")
+
+    stem = re.sub(r'[\\/:*?"<>|]', "", name.rsplit(".", 1)[0]).strip() or "上传文件"
+    inbox_dir = PIPELINE_CONFIG.get("inbox_dir", "00-收件箱")
+    inbox_path = VAULT_ROOT / inbox_dir
+    inbox_path.mkdir(parents=True, exist_ok=True)
+
+    target = inbox_path / f"{stem}{ext}"
+    n = 2
+    while target.exists():
+        target = inbox_path / f"{stem}-{n}{ext}"
+        n += 1
+    target.write_bytes(data)
+    return {"file": str(target.relative_to(VAULT_ROOT)), "name": target.name}
 
 
 def add_to_inbox(text: str) -> dict:

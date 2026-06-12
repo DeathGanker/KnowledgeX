@@ -32,6 +32,7 @@ function vaultApp() {
     inboxOpen: false,
     inboxInput: '',          // app 内录入框
     inboxAdding: false,
+    inboxUploading: false,   // 本地文件上传中
     // 笔记轻量编辑
     editingNote: false,
     editBody: '',
@@ -911,6 +912,32 @@ function vaultApp() {
         this.showNotice({title: '录入失败', body: this.escapeHtml(e.message), kind: 'danger'});
       } finally {
         this.inboxAdding = false;
+      }
+    },
+
+    async uploadInboxFiles(event) {
+      const files = Array.from(event.target.files || []);
+      event.target.value = '';   // 重置，便于再次选同名文件
+      if (!files.length) return;
+      this.inboxUploading = true;
+      let ok = 0;
+      try {
+        for (const f of files) {
+          const fd = new FormData();
+          fd.append('file', f);
+          const r = await fetch('/api/inbox/upload', {method: 'POST', body: fd});
+          if (r.ok) { ok++; }
+          else {
+            const e = await r.json().catch(() => ({}));
+            this.showNotice({title: '上传失败：' + this.escapeHtml(f.name), body: this.escapeHtml(e.detail || ('HTTP ' + r.status)), kind: 'danger'});
+          }
+        }
+        if (ok) {
+          this.loadTree();
+          this.showNotice({title: `已上传 ${ok} 个文件`, body: '已存入收件箱，点「开始处理」即抽取 → 消化 → 归位。', kind: 'info'});
+        }
+      } finally {
+        this.inboxUploading = false;
       }
     },
 
