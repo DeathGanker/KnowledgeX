@@ -480,6 +480,7 @@ html, body {
 .recall-note { padding: 8px 12px; border-bottom: 1px solid var(--hairline); }
 .recall-note:last-child { border-bottom: none; }
 .recall-note-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+.recall-graph-tag { font-size: 10px; color: var(--accent-breeze); border: 1px solid var(--accent-breeze); border-radius: 4px; padding: 0 5px; white-space: nowrap; flex-shrink: 0; }
 .recall-n {
   display: inline-flex; align-items: center; gap: 6px;
   background: none; border: none; cursor: pointer; padding: 0;

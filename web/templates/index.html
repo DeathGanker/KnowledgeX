@@ -20,7 +20,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.min.css">
-  <link rel="stylesheet" href="/static/css/app.css?v=20260612a">
+  <link rel="stylesheet" href="/static/css/app.css?v=20260612b">
 </head>
 <body class="h-screen overflow-hidden">
 
@@ -230,7 +230,7 @@
                     <div class="mt-2.5 pt-2.5 hair-t flex gap-1.5 flex-wrap items-center">
                       <button x-show="m.recall && m.recall.length" @click="toggleRecall(i)" class="pill pill-sm">
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3" stroke-linecap="round"/></svg>
-                        召回 <span x-text="(m.recall||[]).length"></span> 篇 · 引用 <span x-text="(m.cited||[]).length"></span>
+                        召回 <span x-text="(m.recall||[]).length"></span> 篇 · 引用 <span x-text="(m.cited||[]).length"></span><span x-show="(m.recall||[]).some(n => n.source_type==='graph_neighbor')" style="color:var(--accent-breeze)" title="其中若干篇是沿知识图谱双链扩展召回的"> · 🔗<span x-text="(m.recall||[]).filter(n => n.source_type==='graph_neighbor').length"></span> 图扩展</span>
                         <span x-text="m.recallOpen ? '▴' : '▾'"></span>
                       </button>
                       <button x-show="chatTab==='note' && currentNote" @click="appendInsight(i)" class="pill pill-sm">＋ 追加原笔记</button>
@@ -245,10 +245,13 @@
                       <template x-for="note in m.recall" :key="note.n">
                         <div class="recall-note">
                           <div class="recall-note-head">
-                            <button class="recall-n" @click="openNote(note.note_path)" :title="note.note_path">
-                              <span class="cite-n" x-text="note.n"></span>
-                              <span x-text="note.note_title.replace(/^\d{4}-\d{2}-\d{2}\s+/, '')"></span>
-                            </button>
+                            <div style="display:flex;align-items:center;gap:6px;min-width:0">
+                              <button class="recall-n" @click="openNote(note.note_path)" :title="note.note_path">
+                                <span class="cite-n" x-text="note.n"></span>
+                                <span x-text="note.note_title.replace(/^\d{4}-\d{2}-\d{2}\s+/, '')"></span>
+                              </button>
+                              <span x-show="note.source_type==='graph_neighbor'" class="recall-graph-tag" title="由知识图谱扩展召回：它不是和问题最像的，而是沿双链与命中笔记相关联的邻居">🔗 图扩展</span>
+                            </div>
                             <span x-show="(m.cited||[]).includes(note.n)" class="recall-used">✓ 已引用</span>
                           </div>
                           <template x-for="(c, ci) in note.chunks" :key="ci">
@@ -894,7 +897,7 @@
 <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
-<script src="/static/js/graph.js?v=20260612a"></script>
-<script src="/static/js/app.js?v=20260612a"></script>
+<script src="/static/js/graph.js?v=20260612b"></script>
+<script src="/static/js/app.js?v=20260612b"></script>
 </body>
 </html>
