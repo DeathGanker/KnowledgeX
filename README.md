@@ -59,7 +59,7 @@ KnowledgeX 是一套自给自足的知识管道 + 问答应用：你把链接丢
 ## 目录结构
 
 ```
-.pipeline/
+KnowledgeX/           ← git clone 下来的仓库根
 ├── web/              FastAPI 后端 + 前端（templates / static / rag / chat / plan …）
 ├── scripts/          管道脚本（process_inbox / digest / fetchers / place / persona …）
 ├── desktop/          Tauri 桌面端壳（src-tauri / start-backend.sh）
@@ -68,11 +68,21 @@ KnowledgeX 是一套自给自足的知识管道 + 问答应用：你把链接丢
 ├── config.yaml       管道/LLM/embedding/DeepWiki 配置（端点可被 .env 覆盖）
 ├── profile.yaml.example  个人画像模板（首次运行经引导生成本地 profile.yaml）
 ├── .env.example      环境变量模板（复制为本地 .env 填写）
-├── rag_index/        向量索引（vectors.npy + chunks.json …）
-├── state.json        收件箱处理状态
-├── run.command       双击：处理收件箱
-└── web.command       双击：启动/重启 Web 服务
+├── run.command       双击：处理收件箱（macOS）
+└── web.command       双击：启动/重启 Web 服务（macOS）
+
+# 运行时自动生成、均不入库（在 .gitignore）：
+#   .env  profile.yaml  rag_index/  state.json  staging/  conversations/  logs/
+#   以及笔记 vault（默认 ~/KnowledgeX，由 .env 的 VAULT_ROOT 决定）
 ```
+
+## 前置要求
+
+- **Python 3.10+**（用到 `X | None` 等新语法）
+- **一个 OpenAI 兼容的 LLM + Embedding 服务**：默认接火山方舟（豆包），需自备 `ARK_API_KEY` 与推理/embedding 接入点；也可换 DeepSeek 等兼容端点（见 `.env.example`）
+- 桌面端（可选）：[Rust](https://rustup.rs) + Node.js + Xcode Command Line Tools（仅 macOS 打包/运行 Tauri 时需要）
+
+> 主要在 macOS 上开发（含 `.command` 双击启动器与 Tauri 桌面端）；后端纯 Python，Linux 亦可跑浏览器端。
 
 ## 快速开始
 
@@ -150,4 +160,4 @@ npm run tauri:dev                # 自动拉起后端 + 打开原生窗口
 
 ## License
 
-MIT
+[MIT](LICENSE) — 随意使用、修改、分发。
