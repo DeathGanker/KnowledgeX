@@ -97,6 +97,7 @@ function vaultApp() {
     planSessionId: null,
     planMsgs: [],         // 方案对话轮次：[{role:'user',text} | {role:'assistant',text,html,meta}]
     _planLoaded: false,
+    _planStreamSid: null, // 正在后台流式的方案会话（切走再切回靠它恢复）
     // GitHub Stars 导入（进度走 activeJobs['stars']）
     starsModal: {open: false, username: '', token: '', saveToken: true, hasToken: false, editToken: false, mode: 'latest', limit: 30},
     // 三栏可拖拽宽度（桌面端，持久化到 localStorage）
@@ -396,6 +397,16 @@ function vaultApp() {
     async switchPlanSession(id, skipSave) {
       if (id === this.planSessionId && skipSave !== true) return;
       this.planSessionId = id;
+      this.planInput = '';
+      this._planContext = null;  // 历史会话的 KB 上下文不持久化；修改靠 prev_html
+      // 切回正在后台流式的那段会话：恢复进行中的内容，不从磁盘覆盖
+      if (id === this._planStreamSid) {
+        this.planMsgs = this._planStreamMsgs || [];
+        this.planHtml = this._planStreamHtml || '';
+        this.planMeta = this._planStreamMeta || {title: '', summary: ''};
+        this.planStreaming = true;
+        return;
+      }
       this.planStreaming = false;
       try {
         const r = await fetch('/api/conversation?kind=plan&session_id=' + encodeURIComponent(id));
@@ -405,8 +416,6 @@ function vaultApp() {
         this.planHtml = lastA ? lastA.html : '';
         this.planMeta = lastA ? (lastA.meta || {title: '', summary: ''}) : {title: '', summary: ''};
       } catch (e) { this.planMsgs = []; this.planHtml = ''; this.planMeta = {title: '', summary: ''}; }
-      this._planContext = null;  // 历史会话的 KB 上下文不持久化；修改靠 prev_html
-      this.planInput = '';
     },
 
     newPlanSession(ctx) {
@@ -436,17 +445,19 @@ function vaultApp() {
       }
     },
 
-    _persistPlan() {
-      if (!this.planSessionId) return;
-      const id = this.planSessionId;
+    // sid/msgs/meta 显式传入发起时锁定的会话（流式期间用户可能已切走）
+    _persistPlan(sid, msgs, meta) {
+      sid = sid || this.planSessionId;
+      msgs = msgs || this.planMsgs;
+      if (!sid) return;
+      const title = ((meta && meta.title) || (msgs.find(m => m.role === 'user') || {}).text || '新方案').slice(0, 40);
       fetch('/api/conversation/save', {
         method: 'POST', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({kind: 'plan', session_id: id, messages: this.planMsgs}),
+        body: JSON.stringify({kind: 'plan', session_id: sid, messages: msgs}),
       }).then(() => {
-        const title = (this.planMeta.title || ((this.planMsgs.find(m => m.role === 'user') || {}).text) || '新方案').slice(0, 40);
-        const s = this.planSessions.find(x => x.session_id === id) || {session_id: id};
-        s.title = title; s.count = this.planMsgs.length;
-        this.planSessions = [s, ...this.planSessions.filter(x => x.session_id !== id)];
+        const s = this.planSessions.find(x => x.session_id === sid) || {session_id: sid};
+        s.title = title; s.count = msgs.length;
+        this.planSessions = [s, ...this.planSessions.filter(x => x.session_id !== sid)];
       }).catch(() => {});
     },
 
@@ -1499,31 +1510,38 @@ function vaultApp() {
       const instruction = this.planInput.trim();
       const prevHtml = this.planHtml || null;   // 有上一版 = 迭代修改
       if (!this.planSessionId) this.newPlanSession(this._planContext);
-      this.planMsgs.push({role: 'user', text: instruction});
+      // 锁定发起时的会话：流式期间用户可能切到别的方案窗口
+      const sid = this.planSessionId;
+      const msgsRef = this.planMsgs;
+      const ctx = this._planContext;
+      msgsRef.push({role: 'user', text: instruction});
       this.planInput = '';
+      let htmlBuf = '', metaBuf = {title: '', summary: ''};
+      this._planStreamSid = sid; this._planStreamMsgs = msgsRef; this._planStreamHtml = ''; this._planStreamMeta = metaBuf;
       this.planStreaming = true;
-      this.planHtml = '';
-      this.planMeta = {title: '', summary: ''};
+      this.planHtml = ''; this.planMeta = {title: '', summary: ''};
+      const onSid = () => this.planSessionId === sid;   // 是否仍在该会话窗口
       try {
         const r = await fetch('/api/plan/generate', {
           method: 'POST', headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({requirements: instruction, knowledge_context: this._planContext || null, prev_html: prevHtml}),
+          body: JSON.stringify({requirements: instruction, knowledge_context: ctx || null, prev_html: prevHtml}),
           signal: this._abortCtrl ? this._abortCtrl.signal : undefined,
         });
         if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || `HTTP ${r.status}`);
         await this._pumpSSE(r, (event, data) => {
-          if (event === 'delta') { this.planHtml += data.text || ''; }
-          else if (event === 'plan_meta') this.planMeta = {title: data.title || '', summary: data.summary || ''};
+          if (event === 'delta') { htmlBuf += data.text || ''; if (this._planStreamSid === sid) this._planStreamHtml = htmlBuf; if (onSid()) this.planHtml = htmlBuf; }
+          else if (event === 'plan_meta') { metaBuf = {title: data.title || '', summary: data.summary || ''}; if (this._planStreamSid === sid) this._planStreamMeta = metaBuf; if (onSid()) this.planMeta = metaBuf; }
           else if (event === 'error') this.showNotice({title: '方案生成出错', body: this.escapeHtml(data.message), kind: 'danger'});
         });
-        // 记录助手轮次（含 html + meta），落盘
-        this.planMsgs.push({role: 'assistant', text: '（已生成方案）', html: this.planHtml, meta: this.planMeta});
-        this._persistPlan();
+        msgsRef.push({role: 'assistant', text: '（已生成方案）', html: htmlBuf, meta: metaBuf});
+        this._persistPlan(sid, msgsRef, metaBuf);   // 始终存回发起的会话
+        if (onSid()) { this.planHtml = htmlBuf; this.planMeta = metaBuf; this.planMsgs = msgsRef; }
       } catch (e) {
-        if (prevHtml) this.planHtml = prevHtml;   // 修改失败回退到上一版
+        if (onSid() && prevHtml) this.planHtml = prevHtml;   // 修改失败回退上一版
         this.showNotice({title: '方案生成失败', body: this.escapeHtml(e.message), kind: 'danger'});
       } finally {
-        this.planStreaming = false;
+        if (this._planStreamSid === sid) { this._planStreamSid = null; this._planStreamMsgs = null; this._planStreamHtml = ''; }
+        if (onSid()) this.planStreaming = false;
       }
     },
 

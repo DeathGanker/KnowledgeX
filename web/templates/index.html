@@ -20,7 +20,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.min.css">
-  <link rel="stylesheet" href="/static/css/app.css?v=20260612g">
+  <link rel="stylesheet" href="/static/css/app.css?v=20260612h">
 </head>
 <body class="h-screen overflow-hidden">
 
@@ -162,63 +162,50 @@
         </div>
       </div>
 
-      <!-- 方案规划主界面（对话迭代式：上方预览/流式，下方需求·修改输入） -->
-      <div x-show="chatTab==='plan'" class="flex-1 flex flex-col overflow-hidden">
-        <div class="flex-1 overflow-y-auto">
-          <div class="max-w-3xl mx-auto w-full px-5 py-5 space-y-3">
-            <!-- 空状态 -->
-            <template x-if="!planStreaming && !planHtml">
-              <div class="flex flex-col items-center justify-center gap-3 text-center" style="min-height:40vh">
-                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" style="color:var(--canvas-mid)"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
-                <div class="eyebrow">方案规划</div>
-                <p class="mono" style="color:var(--canvas-mid);font-size:12px">下方输入需求，AI 结合知识库洞察生成结构化 HTML 方案<br>生成后可继续追问修改（如「把风险评估写详细点」），左侧可切换多个方案</p>
-              </div>
-            </template>
+      <!-- 方案规划主界面（对话迭代式：上方预览/流式，输入用底部统一输入框） -->
+      <div x-show="chatTab==='plan'" class="flex-1 overflow-y-auto">
+        <div class="max-w-3xl mx-auto w-full px-5 py-5 space-y-3">
+          <!-- 空状态 -->
+          <template x-if="!planStreaming && !planHtml">
+            <div class="flex flex-col items-center justify-center gap-3 text-center" style="min-height:40vh">
+              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" style="color:var(--canvas-mid)"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
+              <div class="eyebrow">方案规划</div>
+              <p class="mono" style="color:var(--canvas-mid);font-size:12px">下方输入需求，AI 结合知识库洞察生成结构化 HTML 方案<br>生成后可继续追问修改（如「把风险评估写详细点」），左侧可切换多个方案</p>
+            </div>
+          </template>
 
-            <!-- 已有的修改轮次（指令链） -->
-            <template x-if="planMsgs.length > 1">
-              <div class="flex flex-wrap gap-1">
-                <template x-for="(m, mi) in planMsgs.filter(x => x.role==='user')" :key="mi">
-                  <span class="chip" style="font-size:10px" :title="m.text" x-text="(mi+1) + '. ' + (m.text || '').slice(0, 22)"></span>
-                </template>
-              </div>
-            </template>
+          <!-- 已有的修改轮次（指令链） -->
+          <template x-if="planMsgs.length > 1">
+            <div class="flex flex-wrap gap-1">
+              <template x-for="(m, mi) in planMsgs.filter(x => x.role==='user')" :key="mi">
+                <span class="chip" style="font-size:10px" :title="m.text" x-text="(mi+1) + '. ' + (m.text || '').slice(0, 22)"></span>
+              </template>
+            </div>
+          </template>
 
-            <!-- 生成中：纯文本流式输出（无闪烁） -->
-            <template x-if="planStreaming">
-              <div>
-                <div class="flex items-center justify-between mb-2">
-                  <span class="eyebrow" style="color:var(--accent-sunset)" x-text="planHtml.length ? '◆ 正在生成…' : '◆ 思考中…'"></span>
-                  <span class="mono" style="font-size:11px;color:var(--mute)" x-text="'已生成 ' + (planHtml.length || 0) + ' 字'"></span>
-                </div>
-                <pre class="draft-output mono" style="max-height:60vh;white-space:pre-wrap" x-text="planHtml"></pre>
+          <!-- 生成中：纯文本流式输出（无闪烁） -->
+          <template x-if="planStreaming">
+            <div>
+              <div class="flex items-center justify-between mb-2">
+                <span class="eyebrow" style="color:var(--accent-sunset)" x-text="planHtml.length ? '◆ 正在生成…' : '◆ 思考中…'"></span>
+                <span class="mono" style="font-size:11px;color:var(--mute)" x-text="'已生成 ' + (planHtml.length || 0) + ' 字'"></span>
               </div>
-            </template>
+              <pre class="draft-output mono" style="max-height:60vh;white-space:pre-wrap" x-text="planHtml"></pre>
+            </div>
+          </template>
 
-            <!-- 生成完成：iframe 预览（tab 可交互） -->
-            <template x-if="!planStreaming && planHtml">
-              <div class="plan-viewer">
-                <div class="hair-b p-3 flex items-center justify-between shrink-0">
-                  <span class="eyebrow" style="color:var(--accent-breeze)" x-text="planMeta.title || '方案预览'"></span>
-                  <button @click="savePlan()" :disabled="!planMeta.title" class="pill pill-sm pill-primary">保存方案</button>
-                </div>
-                <iframe id="plan-preview" class="plan-iframe"
-                        :srcdoc="planHtml" sandbox="allow-scripts"
-                        title="方案预览"></iframe>
+          <!-- 生成完成：iframe 预览（tab 可交互） -->
+          <template x-if="!planStreaming && planHtml">
+            <div class="plan-viewer">
+              <div class="hair-b p-3 flex items-center justify-between shrink-0">
+                <span class="eyebrow" style="color:var(--accent-breeze)" x-text="planMeta.title || '方案预览'"></span>
+                <button @click="savePlan()" :disabled="!planMeta.title" class="pill pill-sm pill-primary">保存方案</button>
               </div>
-            </template>
-          </div>
-        </div>
-        <!-- 需求 / 修改指令输入 -->
-        <div class="hair-t shrink-0">
-          <div class="max-w-3xl mx-auto w-full px-5 py-3 flex gap-2 items-end">
-            <textarea x-model="planInput" rows="2" :disabled="planStreaming"
-                      @keydown.enter.meta.prevent="sendPlan()" @keydown.enter.ctrl.prevent="sendPlan()"
-                      :placeholder="planHtml ? '继续修改方案，如「把风险评估写详细点」…（⌘/Ctrl+↵ 发送）' : '描述需求，生成方案…（⌘/Ctrl+↵ 发送）'"
-                      class="field w-full" style="resize:none"></textarea>
-            <button @click="sendPlan()" :disabled="!canSendPlan()" class="pill pill-sm pill-primary"
-                    x-text="planStreaming ? '生成中…' : (planHtml ? '修改' : '生成')"></button>
-          </div>
+              <iframe id="plan-preview" class="plan-iframe"
+                      :srcdoc="planHtml" sandbox="allow-scripts"
+                      title="方案预览"></iframe>
+            </div>
+          </template>
         </div>
       </div>
 
@@ -348,11 +335,11 @@
           <div class="flex gap-2 items-end">
             <textarea x-model="planInput"
               @keydown.enter="if(!$event.shiftKey){ $event.preventDefault(); sendPlan(); }"
-              :disabled="planStreaming" rows="5"
-              placeholder="描述你的项目需求… AI 将结合知识库技术洞察生成结构化 HTML 方案&#10;Enter 发送 · Shift+Enter 换行&#10;从问答跳转过来时上下文已预填，可直接修改"
-              class="field flex-1" style="font-size:14px;resize:vertical;min-height:80px"></textarea>
+              :disabled="planStreaming" rows="3"
+              :placeholder="planHtml ? '继续修改这版方案，如「把风险评估写详细点」「加一节成本估算」…\nEnter 发送 · Shift+Enter 换行' : '描述你的项目需求… AI 结合知识库洞察生成结构化 HTML 方案\nEnter 发送 · Shift+Enter 换行'"
+              class="field flex-1" style="font-size:14px;resize:vertical;min-height:64px"></textarea>
             <button @click="sendPlan()" :disabled="!canSendPlan()" class="pill pill-primary" style="height:40px;padding:0 18px">
-              <span x-show="!planStreaming">生成方案</span>
+              <span x-show="!planStreaming" x-text="planHtml ? '修改方案' : '生成方案'"></span>
               <span x-show="planStreaming" class="dots"><span></span><span></span><span></span></span>
             </button>
           </div>
@@ -951,7 +938,7 @@
 <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
-<script src="/static/js/graph.js?v=20260612g"></script>
-<script src="/static/js/app.js?v=20260612g"></script>
+<script src="/static/js/graph.js?v=20260612h"></script>
+<script src="/static/js/app.js?v=20260612h"></script>
 </body>
 </html>
