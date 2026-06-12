@@ -93,6 +93,10 @@ function vaultApp() {
     planMeta: {title: '', summary: ''},
     planInput: '',
     _planContext: null,   // 从问答触发时带的知识库上下文（含完整 answer + 来源 chunk）
+    planSessions: [],     // 方案规划多会话
+    planSessionId: null,
+    planMsgs: [],         // 方案对话轮次：[{role:'user',text} | {role:'assistant',text,html,meta}]
+    _planLoaded: false,
     // GitHub Stars 导入（进度走 activeJobs['stars']）
     starsModal: {open: false, username: '', token: '', saveToken: true, hasToken: false, editToken: false, mode: 'latest', limit: 30},
     // 三栏可拖拽宽度（桌面端，持久化到 localStorage）
@@ -286,7 +290,7 @@ function vaultApp() {
         this.loadRagStatus();
         if (!this._vaultLoaded) { this._vaultLoaded = true; this.loadVaultSessions(); }  // 首切加载会话列表
       }
-      else if (tab === 'plan') { this.planHtml = ''; this.planMeta = {title:'',summary:''}; this.planInput = ''; }
+      else if (tab === 'plan') { if (!this._planLoaded) { this._planLoaded = true; this.loadPlanSessions(); } }
     },
 
     // ----------------- 对话持久化 -----------------
@@ -367,6 +371,83 @@ function vaultApp() {
       const s = this.vaultSessions.find(x => x.session_id === id) || {session_id: id};
       s.title = title; s.count = msgs.length;
       this.vaultSessions = [s, ...this.vaultSessions.filter(x => x.session_id !== id)];
+    },
+
+    // ---- 会话轨通用分发（vault / plan 共用同一条轨）----
+    railSessions() { return this.chatTab === 'plan' ? this.planSessions : this.vaultSessions; },
+    railCurrentId() { return this.chatTab === 'plan' ? this.planSessionId : this.vaultSessionId; },
+    railNew() { this.chatTab === 'plan' ? this.newPlanSession() : this.newVaultSession(); },
+    railSwitch(id) { this.chatTab === 'plan' ? this.switchPlanSession(id) : this.switchVaultSession(id); },
+    railDelete(id) { this.chatTab === 'plan' ? this.deletePlanSession(id) : this.deleteVaultSession(id); },
+
+    // ---- 方案规划多会话 ----
+    async loadPlanSessions(selectId) {
+      try {
+        const r = await fetch('/api/conversations?kind=plan');
+        if (r.ok) this.planSessions = (await r.json()).sessions || [];
+      } catch (e) { this.planSessions = []; }
+      const ids = this.planSessions.map(s => s.session_id);
+      let target = selectId || this.planSessionId;
+      if (!target || !ids.includes(target)) target = ids[0] || null;
+      if (target) await this.switchPlanSession(target, true);
+      else this.newPlanSession();
+    },
+
+    async switchPlanSession(id, skipSave) {
+      if (id === this.planSessionId && skipSave !== true) return;
+      this.planSessionId = id;
+      this.planStreaming = false;
+      try {
+        const r = await fetch('/api/conversation?kind=plan&session_id=' + encodeURIComponent(id));
+        const msgs = r.ok ? ((await r.json()).messages || []) : [];
+        this.planMsgs = msgs;
+        const lastA = [...msgs].reverse().find(m => m.role === 'assistant' && m.html);
+        this.planHtml = lastA ? lastA.html : '';
+        this.planMeta = lastA ? (lastA.meta || {title: '', summary: ''}) : {title: '', summary: ''};
+      } catch (e) { this.planMsgs = []; this.planHtml = ''; this.planMeta = {title: '', summary: ''}; }
+      this._planContext = null;  // 历史会话的 KB 上下文不持久化；修改靠 prev_html
+      this.planInput = '';
+    },
+
+    newPlanSession(ctx) {
+      const id = this._genId();
+      this.planSessionId = id;
+      this.planMsgs = [];
+      this.planHtml = '';
+      this.planMeta = {title: '', summary: ''};
+      this.planInput = '';
+      this._planContext = ctx || null;
+      this.planSessions = [{session_id: id, title: '新方案', updated_at: null, count: 0},
+                           ...this.planSessions.filter(s => s.session_id !== id)];
+    },
+
+    async deletePlanSession(id) {
+      const ok = await this.askConfirm({title: '删除方案对话', body: '将删除这段方案对话记录，不可恢复（已保存到 04-项目 的 HTML 不受影响）。', confirmText: '删除', danger: true});
+      if (!ok) return;
+      try {
+        await fetch('/api/conversation/clear', {method: 'POST', headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({kind: 'plan', session_id: id})});
+      } catch (e) { /* 忽略 */ }
+      this.planSessions = this.planSessions.filter(s => s.session_id !== id);
+      if (this.planSessionId === id) {
+        const next = this.planSessions[0];
+        if (next) await this.switchPlanSession(next.session_id, true);
+        else this.newPlanSession();
+      }
+    },
+
+    _persistPlan() {
+      if (!this.planSessionId) return;
+      const id = this.planSessionId;
+      fetch('/api/conversation/save', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({kind: 'plan', session_id: id, messages: this.planMsgs}),
+      }).then(() => {
+        const title = (this.planMeta.title || ((this.planMsgs.find(m => m.role === 'user') || {}).text) || '新方案').slice(0, 40);
+        const s = this.planSessions.find(x => x.session_id === id) || {session_id: id};
+        s.title = title; s.count = this.planMsgs.length;
+        this.planSessions = [s, ...this.planSessions.filter(x => x.session_id !== id)];
+      }).catch(() => {});
     },
 
     // 惰性拉某上下文的持久会话；回填前校验上下文未变（防快速切换错位）
@@ -1382,20 +1463,17 @@ function vaultApp() {
 
     canSendPlan() { return this.planInput.trim() && !this.planStreaming; },
 
-    switchToPlan(contextFromQA) {
+    async switchToPlan(contextFromQA) {
       // 必须在切 chatTab 之前抓当前对话（此刻 this.messages 还是 vault 的）
       const curMsgs = this.messages;
       this.chatTab = 'plan';
-      this.planHtml = '';
-      this.planMeta = {title: '', summary: ''};
-      this.planInput = '';
-      this._planContext = null;
+      if (!this._planLoaded) { this._planLoaded = true; await this.loadPlanSessions(); }
+      let seed = '', ctx = null;
       if (contextFromQA) {
-        this.planInput = '基于以下问答内容生成项目方案。\n\n## 问题\n' + (contextFromQA.question || '');
+        seed = '基于以下问答内容生成项目方案。\n\n## 问题\n' + (contextFromQA.question || '');
         // 知识库上下文：完整 AI 回答 + 召回笔记正文（不是标题），让方案规划拿到实体洞察
-        let ctx = '## 用户原始问题\n' + (contextFromQA.question || '') + '\n\n';
+        ctx = '## 用户原始问题\n' + (contextFromQA.question || '') + '\n\n';
         ctx += '## AI 综合回答（含知识库洞察）\n' + (contextFromQA.answer || '') + '\n\n';
-        // 优先用按钮传入的 recall（最可靠），回退到从当前对话里找
         let recall = contextFromQA.recall;
         if (!recall || !recall.length) {
           const lastAsst = [...(curMsgs || [])].reverse().find(m => m.role === 'assistant' && m.recall && m.recall.length);
@@ -1410,19 +1488,26 @@ function vaultApp() {
             }
           }
         }
-        this._planContext = ctx;
       }
+      // 每次从问答跳来都开一段新方案会话，预填需求
+      this.newPlanSession(ctx);
+      this.planInput = seed;
     },
 
     async sendPlan() {
       if (!this.canSendPlan()) return;
+      const instruction = this.planInput.trim();
+      const prevHtml = this.planHtml || null;   // 有上一版 = 迭代修改
+      if (!this.planSessionId) this.newPlanSession(this._planContext);
+      this.planMsgs.push({role: 'user', text: instruction});
+      this.planInput = '';
       this.planStreaming = true;
       this.planHtml = '';
       this.planMeta = {title: '', summary: ''};
       try {
         const r = await fetch('/api/plan/generate', {
           method: 'POST', headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({requirements: this.planInput, knowledge_context: this._planContext || null}),
+          body: JSON.stringify({requirements: instruction, knowledge_context: this._planContext || null, prev_html: prevHtml}),
           signal: this._abortCtrl ? this._abortCtrl.signal : undefined,
         });
         if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || `HTTP ${r.status}`);
@@ -1431,7 +1516,11 @@ function vaultApp() {
           else if (event === 'plan_meta') this.planMeta = {title: data.title || '', summary: data.summary || ''};
           else if (event === 'error') this.showNotice({title: '方案生成出错', body: this.escapeHtml(data.message), kind: 'danger'});
         });
+        // 记录助手轮次（含 html + meta），落盘
+        this.planMsgs.push({role: 'assistant', text: '（已生成方案）', html: this.planHtml, meta: this.planMeta});
+        this._persistPlan();
       } catch (e) {
+        if (prevHtml) this.planHtml = prevHtml;   // 修改失败回退到上一版
         this.showNotice({title: '方案生成失败', body: this.escapeHtml(e.message), kind: 'danger'});
       } finally {
         this.planStreaming = false;

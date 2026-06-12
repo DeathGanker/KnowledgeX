@@ -396,6 +396,7 @@ class PlanRequest(BaseModel):
     requirements: str
     history: list[dict] = []
     knowledge_context: str | None = None   # 从问答触发时带入的上下文
+    prev_html: str | None = None            # 迭代修改：上一版方案 HTML
 
 
 @app.post("/api/plan/generate")
@@ -406,7 +407,7 @@ def api_plan_generate(req: PlanRequest):
         raise HTTPException(400, "需求描述不能为空")
 
     def gen():
-        for event in plan.stream_plan(req.requirements, req.history, req.knowledge_context):
+        for event in plan.stream_plan(req.requirements, req.history, req.knowledge_context, req.prev_html):
             yield event
 
     return StreamingResponse(

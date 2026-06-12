@@ -173,9 +173,11 @@ def stream_plan(
     requirements: str,
     history: Optional[list[dict]] = None,
     knowledge_context: Optional[str] = None,
+    prev_html: Optional[str] = None,
 ) -> Generator[str, None, None]:
     """流式生成 HTML 方案文档，SSE 事件。
 
+    prev_html 非空时为**迭代修改**：在已有方案 HTML 基础上按用户要求改，输出完整新 HTML。
     事件：start → delta(HTML 逐段) → plan_meta({title, summary}) → end
     """
     yield chat._sse("start", {"mode": "plan"})
@@ -183,20 +185,32 @@ def stream_plan(
     # 注入画像
     persona_text = render_persona()
 
-    system_prompt = (
-        persona_text
-        + "\n\n你是上面这位用户的方案架构师。"
-        "下面会给你「用户需求」和「知识库上下文」（可能来自全库问答的检索结果，含 AI 分析和笔记正文）。\n\n"
-        "工作方式：\n"
-        "1. 先从知识库上下文中提取与需求相关的技术洞察、参考方案、选型依据\n"
-        "2. 在方案的「背景与需求」中引用知识库里的技术趋势/痛点数据\n"
-        "3. 在「方案对比」中纳入知识库里已有的同类方案作为比较基准\n"
-        "4. 在「知识库参考」章节中**具体**列出每篇参考笔记及从中获得的洞察（不要泛泛而谈）\n"
-        "5. 如果知识库上下文里没有相关信息，诚实说明\"知识库里关于这个领域的内容不足\"，但仍基于你的理解给出方案\n\n"
-        + _PLAN_SYSTEM
-    )
-
-    user_content = _build_plan_user(requirements, knowledge_context, history)
+    if prev_html:
+        # 迭代修改：基于上一版方案改全量
+        system_prompt = (
+            persona_text
+            + "\n\n你是上面这位用户的方案架构师。用户已有一份 HTML 方案，现在要在其基础上**迭代修改**。\n"
+            "保持原方案的 HTML 骨架、风格与无关部分不变，只按用户的修改要求调整相应内容；"
+            "输出**修改后的完整 HTML 文件**（从 `<!DOCTYPE html>` 开始，不要 markdown 代码块包裹）。\n\n"
+            + _PLAN_SYSTEM
+        )
+        user_content = f"## 当前方案 HTML（在此基础上修改）\n{prev_html}\n\n## 用户的修改要求\n{requirements}"
+        if knowledge_context:
+            user_content += "\n\n## 可参考的知识库上下文\n" + knowledge_context
+    else:
+        system_prompt = (
+            persona_text
+            + "\n\n你是上面这位用户的方案架构师。"
+            "下面会给你「用户需求」和「知识库上下文」（可能来自全库问答的检索结果，含 AI 分析和笔记正文）。\n\n"
+            "工作方式：\n"
+            "1. 先从知识库上下文中提取与需求相关的技术洞察、参考方案、选型依据\n"
+            "2. 在方案的「背景与需求」中引用知识库里的技术趋势/痛点数据\n"
+            "3. 在「方案对比」中纳入知识库里已有的同类方案作为比较基准\n"
+            "4. 在「知识库参考」章节中**具体**列出每篇参考笔记及从中获得的洞察（不要泛泛而谈）\n"
+            "5. 如果知识库上下文里没有相关信息，诚实说明\"知识库里关于这个领域的内容不足\"，但仍基于你的理解给出方案\n\n"
+            + _PLAN_SYSTEM
+        )
+        user_content = _build_plan_user(requirements, knowledge_context, history)
 
     client, llm_cfg = chat._llm_client()
     try:

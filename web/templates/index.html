@@ -20,7 +20,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.min.css">
-  <link rel="stylesheet" href="/static/css/app.css?v=20260612f">
+  <link rel="stylesheet" href="/static/css/app.css?v=20260612g">
 </head>
 <body class="h-screen overflow-hidden">
 
@@ -106,28 +106,28 @@
     <!-- 中栏：问答主区（主角，内容居中） -->
     <main class="col-chat flex-1 flex flex-col overflow-hidden" style="position:relative">
       <!-- 会话历史侧轨：浮在中间栏左侧空位（不占文件树），仅全库问答显示 -->
-      <aside x-show="chatTab==='vault' && railOpen" x-transition.opacity class="session-rail hidden lg:flex">
+      <aside x-show="(chatTab==='vault' || chatTab==='plan') && railOpen" x-transition.opacity class="session-rail hidden lg:flex">
         <div class="session-rail-head">
-          <span class="eyebrow">◇ 对话</span>
+          <span class="eyebrow" x-text="chatTab==='plan' ? '◇ 方案' : '◇ 对话'"></span>
           <div class="flex items-center gap-1">
-            <button @click="newVaultSession()" class="pill pill-sm pill-accent" title="新建一段对话">＋</button>
-            <button @click="toggleRail()" class="pill pill-sm" title="收起对话历史">«</button>
+            <button @click="railNew()" class="pill pill-sm pill-accent" :title="chatTab==='plan' ? '新建一段方案' : '新建一段对话'">＋</button>
+            <button @click="toggleRail()" class="pill pill-sm" title="收起历史">«</button>
           </div>
         </div>
         <div class="session-list">
-          <template x-for="s in vaultSessions" :key="s.session_id">
-            <div class="session-item" :class="s.session_id===vaultSessionId ? 'active' : ''" @click="switchVaultSession(s.session_id)">
-              <span class="session-title" x-text="s.title || '新对话'"></span>
-              <button class="session-del" @click.stop="deleteVaultSession(s.session_id)" title="删除这段对话">×</button>
+          <template x-for="s in railSessions()" :key="s.session_id">
+            <div class="session-item" :class="s.session_id===railCurrentId() ? 'active' : ''" @click="railSwitch(s.session_id)">
+              <span class="session-title" x-text="s.title || (chatTab==='plan' ? '新方案' : '新对话')"></span>
+              <button class="session-del" @click.stop="railDelete(s.session_id)" title="删除这段记录">×</button>
             </div>
           </template>
-          <template x-if="!vaultSessions.length">
-            <div class="eyebrow" style="padding:8px;color:var(--canvas-mid)">还没有对话</div>
+          <template x-if="!railSessions().length">
+            <div class="eyebrow" style="padding:8px;color:var(--canvas-mid)" x-text="chatTab==='plan' ? '还没有方案' : '还没有对话'"></div>
           </template>
         </div>
       </aside>
       <!-- 收起后：左上角浮一个重开按钮 -->
-      <button x-show="chatTab==='vault' && !railOpen" @click="toggleRail()" class="session-reopen hidden lg:flex" title="展开对话历史">☰ 对话</button>
+      <button x-show="(chatTab==='vault' || chatTab==='plan') && !railOpen" @click="toggleRail()" class="session-reopen hidden lg:flex" title="展开历史" x-text="chatTab==='plan' ? '☰ 方案' : '☰ 对话'"></button>
       <!-- 头部 -->
       <div class="hair-b shrink-0">
         <div class="max-w-3xl mx-auto w-full px-5 py-3">
@@ -162,44 +162,63 @@
         </div>
       </div>
 
-      <!-- 方案规划主界面（替代对话区） -->
-      <div x-show="chatTab==='plan'" class="flex-1 overflow-y-auto">
-        <div class="max-w-3xl mx-auto w-full px-5 py-5 space-y-4">
-          <!-- 空状态 -->
-          <template x-if="!planStreaming && !planHtml">
-            <div class="flex flex-col items-center justify-center gap-3 text-center" style="min-height:40vh">
-              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" style="color:var(--canvas-mid)"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
-              <div class="eyebrow">方案规划</div>
-              <p class="mono" style="color:var(--canvas-mid);font-size:12px">输入需求描述，AI 结合知识库洞察生成结构化 HTML 方案文档<br>含项目概述 / 方案对比表格 / 实施计划 / 风险评估</p>
-            </div>
-          </template>
-
-          <!-- 生成中：纯文本流式输出（无闪烁） -->
-          <template x-if="planStreaming">
-            <div>
-              <div class="flex items-center justify-between mb-2">
-                <span class="eyebrow" style="color:var(--accent-sunset)">◆ 正在生成…</span>
-                <span class="mono" style="font-size:11px;color:var(--mute)" x-text="'已生成 ' + (planHtml.length || 0) + ' 字'"></span>
+      <!-- 方案规划主界面（对话迭代式：上方预览/流式，下方需求·修改输入） -->
+      <div x-show="chatTab==='plan'" class="flex-1 flex flex-col overflow-hidden">
+        <div class="flex-1 overflow-y-auto">
+          <div class="max-w-3xl mx-auto w-full px-5 py-5 space-y-3">
+            <!-- 空状态 -->
+            <template x-if="!planStreaming && !planHtml">
+              <div class="flex flex-col items-center justify-center gap-3 text-center" style="min-height:40vh">
+                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" style="color:var(--canvas-mid)"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
+                <div class="eyebrow">方案规划</div>
+                <p class="mono" style="color:var(--canvas-mid);font-size:12px">下方输入需求，AI 结合知识库洞察生成结构化 HTML 方案<br>生成后可继续追问修改（如「把风险评估写详细点」），左侧可切换多个方案</p>
               </div>
-              <pre class="draft-output mono" style="max-height:60vh;white-space:pre-wrap" x-text="planHtml"></pre>
-            </div>
-          </template>
+            </template>
 
-          <!-- 生成完成：iframe 预览（tab 可交互） -->
-          <template x-if="!planStreaming && planHtml">
-            <div class="plan-viewer">
-              <div class="hair-b p-3 flex items-center justify-between shrink-0">
-                <span class="eyebrow" style="color:var(--accent-breeze)" x-text="planMeta.title || '方案预览'"></span>
-                <div class="flex items-center gap-2">
-                  <button @click="savePlan()" :disabled="!planMeta.title" class="pill pill-sm pill-primary">保存方案</button>
-                  <button @click="planHtml=''; planMeta={title:'',summary:''}" class="pill pill-sm">重新生成</button>
+            <!-- 已有的修改轮次（指令链） -->
+            <template x-if="planMsgs.length > 1">
+              <div class="flex flex-wrap gap-1">
+                <template x-for="(m, mi) in planMsgs.filter(x => x.role==='user')" :key="mi">
+                  <span class="chip" style="font-size:10px" :title="m.text" x-text="(mi+1) + '. ' + (m.text || '').slice(0, 22)"></span>
+                </template>
+              </div>
+            </template>
+
+            <!-- 生成中：纯文本流式输出（无闪烁） -->
+            <template x-if="planStreaming">
+              <div>
+                <div class="flex items-center justify-between mb-2">
+                  <span class="eyebrow" style="color:var(--accent-sunset)" x-text="planHtml.length ? '◆ 正在生成…' : '◆ 思考中…'"></span>
+                  <span class="mono" style="font-size:11px;color:var(--mute)" x-text="'已生成 ' + (planHtml.length || 0) + ' 字'"></span>
                 </div>
+                <pre class="draft-output mono" style="max-height:60vh;white-space:pre-wrap" x-text="planHtml"></pre>
               </div>
-              <iframe id="plan-preview" class="plan-iframe"
-                      :srcdoc="planHtml" sandbox="allow-scripts"
-                      title="方案预览"></iframe>
-            </div>
-          </template>
+            </template>
+
+            <!-- 生成完成：iframe 预览（tab 可交互） -->
+            <template x-if="!planStreaming && planHtml">
+              <div class="plan-viewer">
+                <div class="hair-b p-3 flex items-center justify-between shrink-0">
+                  <span class="eyebrow" style="color:var(--accent-breeze)" x-text="planMeta.title || '方案预览'"></span>
+                  <button @click="savePlan()" :disabled="!planMeta.title" class="pill pill-sm pill-primary">保存方案</button>
+                </div>
+                <iframe id="plan-preview" class="plan-iframe"
+                        :srcdoc="planHtml" sandbox="allow-scripts"
+                        title="方案预览"></iframe>
+              </div>
+            </template>
+          </div>
+        </div>
+        <!-- 需求 / 修改指令输入 -->
+        <div class="hair-t shrink-0">
+          <div class="max-w-3xl mx-auto w-full px-5 py-3 flex gap-2 items-end">
+            <textarea x-model="planInput" rows="2" :disabled="planStreaming"
+                      @keydown.enter.meta.prevent="sendPlan()" @keydown.enter.ctrl.prevent="sendPlan()"
+                      :placeholder="planHtml ? '继续修改方案，如「把风险评估写详细点」…（⌘/Ctrl+↵ 发送）' : '描述需求，生成方案…（⌘/Ctrl+↵ 发送）'"
+                      class="field w-full" style="resize:none"></textarea>
+            <button @click="sendPlan()" :disabled="!canSendPlan()" class="pill pill-sm pill-primary"
+                    x-text="planStreaming ? '生成中…' : (planHtml ? '修改' : '生成')"></button>
+          </div>
         </div>
       </div>
 
@@ -932,7 +951,7 @@
 <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
-<script src="/static/js/graph.js?v=20260612f"></script>
-<script src="/static/js/app.js?v=20260612f"></script>
+<script src="/static/js/graph.js?v=20260612g"></script>
+<script src="/static/js/app.js?v=20260612g"></script>
 </body>
 </html>
