@@ -186,10 +186,15 @@ def run(dry_run: bool = False, no_llm: bool = False, only: str | None = None) ->
         if rec.status == "processed" and rec.source_file and rec.output_path:
             processed_by_file.setdefault(rec.source_file, []).append(rec.output_path)
     try:
+        # CLI/子进程的 sys.path 只有 scripts/，要先把仓库根加上才 import 得到 web 包
+        if str(PIPELINE_DIR) not in sys.path:
+            sys.path.insert(0, str(PIPELINE_DIR))
         from web.rag import graph  # 轻量（json+pathlib），延迟导入避免 CLI 顶层耦合 web
         touched = graph.apply_gap_links(processed_by_file)
         if touched:
             logger.info(f"  🔗 缺口笔记并入图谱：{touched} 条关联边")
+        else:
+            logger.info("  (本次无缺口笔记需要建立关联)")
     except Exception as e:
         logger.warning(f"  (缺口关联跳过：{e})")
 
