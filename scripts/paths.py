@@ -44,6 +44,30 @@ def resolve_vault_root() -> Path:
     return (Path.home() / "KnowledgeX").resolve()
 
 
+# 全新收件箱的起步文件：按来源分桶，给用户一个「往哪贴链接」的入口。
+# app 文件树里可直接打开编辑；处理收件箱时会抓取其中所有 URL。
+_INBOX_SEED = {
+    "GitHub 链接.md": (
+        "# GitHub 链接\n\n"
+        "把 GitHub 仓库链接每行一条贴在下面，然后在 app 里点「处理收件箱」"
+        "即可抓取 README → 消化 → 归位。\n\n- \n"
+    ),
+    "微信分享.md": (
+        "# 微信分享\n\n"
+        "把微信公众号文章链接每行一条贴在下面，然后在 app 里点「处理收件箱」"
+        "即可抓取正文 → 消化 → 归位。\n\n- \n"
+    ),
+}
+
+
+def _seed_inbox(inbox_path: Path) -> None:
+    """仅当收件箱还没有任何 .md 时，放入按来源分桶的起步文件（不覆盖用户已有内容）。"""
+    if any(inbox_path.glob("*.md")):
+        return
+    for name, body in _INBOX_SEED.items():
+        (inbox_path / name).write_text(body, encoding="utf-8")
+
+
 def ensure_vault(root: Path) -> Path:
     """创建 vault 根并幂等补齐标准子目录（已存在的不动）。返回 root 方便链式。
 
@@ -53,6 +77,7 @@ def ensure_vault(root: Path) -> Path:
     root.mkdir(parents=True, exist_ok=True)
     for d in STANDARD_DIRS:
         (root / d).mkdir(exist_ok=True)
+    _seed_inbox(root / "00-收件箱")
     return root
 
 

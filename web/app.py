@@ -16,7 +16,7 @@ from web.config import HOST, PORT, WEB_TOKEN, VAULT_ROOT
 from web.rag import index as rag_index
 
 
-app = FastAPI(title="Obsidian 知识库 Web 应用", docs_url=None, redoc_url=None)
+app = FastAPI(title="KnowledgeX Web 应用", docs_url=None, redoc_url=None)
 
 # 鉴权中间件
 app.add_middleware(TokenAuthMiddleware)
@@ -643,7 +643,7 @@ def main():
 
     print()
     print("=" * 70)
-    print(f"  Obsidian 知识库 Web 启动中...")
+    print(f"  KnowledgeX Web 启动中...")
     print(f"  访问 URL（含 token，首次进入用这个）：")
     print(f"    本机:    http://localhost:{PORT}/?token={WEB_TOKEN}")
     # 试图打印局域网 IP

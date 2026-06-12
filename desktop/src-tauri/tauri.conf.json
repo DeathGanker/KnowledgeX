@@ -37,6 +37,6 @@
     ],
     "category": "Productivity",
     "shortDescription": "个人知识助手桌面端",
-    "longDescription": "Obsidian 个人知识库的桌面客户端：收件箱消化、全库 RAG 问答、方案规划。复用 FastAPI 后端，本地 127.0.0.1 运行。"
+    "longDescription": "KnowledgeX 个人知识库的桌面客户端：收件箱消化、全库 RAG 问答、方案规划。复用 FastAPI 后端，本地 127.0.0.1 运行。"
   }
 }

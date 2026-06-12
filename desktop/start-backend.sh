@@ -4,15 +4,15 @@
 # 进程在前台常驻，Tauri 轮询 devUrl 起来后再开窗口；关掉窗口时 Tauri 收掉本进程。
 set -euo pipefail
 
-# desktop/ 的上一级就是 .pipeline
-PIPELINE_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-cd "$PIPELINE_DIR"
+# desktop/ 的上一级就是仓库根（含 web/、scripts/、.venv 等）
+REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$REPO_DIR"
 
 PORT="${DESKTOP_PORT:-7346}"
 
 if [[ ! -x .venv/bin/python ]]; then
-  echo "❌ 未找到 .venv，请先初始化后端依赖："
-  echo "   cd .pipeline && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt"
+  echo "❌ 未找到 .venv，请先在仓库根目录初始化后端依赖："
+  echo "   python3 -m venv .venv && .venv/bin/pip install -r requirements.txt"
   exit 1
 fi
 

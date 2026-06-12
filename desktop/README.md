@@ -18,9 +18,9 @@
 
 ## 前置依赖（macOS，一次性）
 
-1. **后端 venv**（若还没建）：
+1. **后端 venv**（若还没建，在仓库根目录）：
    ```bash
-   cd .pipeline && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+   python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
    ```
 2. **Rust 工具链**（Tauri 必需）：https://rustup.rs
    ```bash
@@ -29,17 +29,17 @@
 3. **Xcode Command Line Tools**：`xcode-select --install`
 4. **Node 依赖**：
    ```bash
-   cd .pipeline/desktop && npm install
+   cd desktop && npm install
    ```
 
 ## 运行
 
 ```bash
-cd .pipeline/desktop
+cd desktop
 npm run tauri:dev        # 拉起后端 + 打开桌面窗口（首次会编译 Rust，较慢）
 ```
 
-或双击 `.pipeline/desktop/桌面端.command`（自动 `npm install` + `tauri:dev`）。
+或双击 `desktop/桌面端.command`（自动 `npm install` + `tauri:dev`）。
 
 ## 文件
 

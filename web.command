@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 重启 Obsidian 知识库 Web 应用（先杀旧进程，再启动），并自动打开浏览器
+# 重启 KnowledgeX Web 应用（先杀旧进程，再启动），并自动打开浏览器
 set -u
 cd "$(dirname "$0")" || exit 1
 
@@ -7,13 +7,13 @@ banner() {
     printf "\n\033[1;36m▎%s\033[0m\n" "$1"
 }
 
-banner "Obsidian 知识库 Web · 重启 · $(date '+%Y-%m-%d %H:%M:%S')"
+banner "KnowledgeX Web · 重启 · $(date '+%Y-%m-%d %H:%M:%S')"
 echo "工作目录: $(pwd)"
 
 if [[ ! -x .venv/bin/python ]]; then
     echo
-    echo "❌ 未找到 .venv，请先初始化："
-    echo "   cd .pipeline && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt"
+    echo "❌ 未找到 .venv，请先在仓库根目录初始化："
+    echo "   python3 -m venv .venv && .venv/bin/pip install -r requirements.txt"
     echo
     read -r -p "按回车关闭窗口..."
     exit 1

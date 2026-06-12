@@ -64,7 +64,8 @@ KnowledgeX 是一套自给自足的知识管道 + 问答应用：你把链接丢
 ### 1) 安装依赖
 
 ```bash
-cd .pipeline
+git clone https://github.com/DeathGanker/KnowledgeX.git
+cd KnowledgeX
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 ```

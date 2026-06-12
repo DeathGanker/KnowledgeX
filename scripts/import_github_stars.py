@@ -307,7 +307,7 @@ def run(args: argparse.Namespace) -> int:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="把 GitHub starred 仓库导入到 Obsidian vault")
+    parser = argparse.ArgumentParser(description="把 GitHub starred 仓库导入到 vault")
     parser.add_argument("username", help="GitHub 用户名")
     parser.add_argument("--list", action="store_true", help="仅列出统计，不抓取不调 LLM")
     parser.add_argument("--no-llm", action="store_true", help="只抓取并 staging，不调 LLM 不归位")

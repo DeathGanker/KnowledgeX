@@ -184,7 +184,7 @@ def run(dry_run: bool = False, no_llm: bool = False, only: str | None = None) ->
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Obsidian 收件箱处理管道")
+    parser = argparse.ArgumentParser(description="KnowledgeX 收件箱处理管道")
     parser.add_argument("--dry-run", action="store_true", help="只扫描列出，不抓取不写")
     parser.add_argument("--no-llm", action="store_true", help="抓取并 staging，但不调 LLM 不归位")
     parser.add_argument("--only", help="子串过滤目标（debug 用）")

@@ -11,14 +11,14 @@ banner() {
     printf "\n\033[1;36m▎%s\033[0m\n" "$1"
 }
 
-banner "Obsidian 收件箱处理 · $(date '+%Y-%m-%d %H:%M:%S')"
+banner "KnowledgeX 收件箱处理 · $(date '+%Y-%m-%d %H:%M:%S')"
 echo "工作目录: $(pwd)"
 
 PY=".venv/bin/python"
 if [[ ! -x "$PY" ]]; then
     echo
-    echo "❌ 未找到 .venv，请先初始化："
-    echo "   cd .pipeline && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt"
+    echo "❌ 未找到 .venv，请先在仓库根目录初始化："
+    echo "   python3 -m venv .venv && .venv/bin/pip install -r requirements.txt"
     echo
     read -r -p "按回车关闭窗口..."
     exit 1

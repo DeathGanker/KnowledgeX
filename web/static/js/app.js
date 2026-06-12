@@ -44,6 +44,7 @@ function vaultApp() {
     noticeModal: {open: false, title: '', body: '', kind: 'info'},
     // 首次使用引导（profile 未配置时弹出）
     onboardOpen: false,
+    onboarding: false,   // 是否处于引导流程中（画像存完后续接目录体系）
     // 个人画像配置
     profileOpen: false,
     profileForm: {role: '', working_style: '', _cares: '', _interests: '', _dislikes: '', extra: ''},
@@ -860,6 +861,7 @@ function vaultApp() {
       // 进入画像配置，停在「画像」页（右侧即 AI 引导向导）
       this.onboardOpen = false;
       this.openProfile();
+      this.onboarding = true;  // 标记引导中：存完画像会自动续接「目录体系」
     },
 
     dismissOnboarding() {
@@ -872,6 +874,7 @@ function vaultApp() {
     async openProfile() {
       this.profileOpen = true;
       this.profileSaved = false;
+      this.onboarding = false;  // 默认非引导（从顶栏「画像」直接打开）；startOnboarding 会再置 true
       this.profileTab = 'persona';
       this.resetWizard();
       this.resetTaxonomySuggest();
@@ -919,6 +922,12 @@ function vaultApp() {
         if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || `HTTP ${r.status}`);
         this.profileSaved = true;
         setTimeout(() => { this.profileSaved = false; }, 3000);
+        if (this.onboarding) {
+          // 引导流程：画像存好后续接「目录体系」——这一步决定笔记往哪归位
+          this.profileTab = 'taxonomy';
+          await this.loadTaxonomy();
+          this.showNotice({title: '画像已保存 ✓', body: '下一步：确认归位的「目录体系」，可点「AI 推荐」按你的画像生成。', kind: 'success'});
+        }
       } catch (e) {
         this.showNotice({title: '保存画像失败', body: this.escapeHtml(e.message), kind: 'danger'});
       } finally {
@@ -1067,6 +1076,12 @@ function vaultApp() {
         };
         this.taxonomySaved = true;
         setTimeout(() => { this.taxonomySaved = false; }, 3000);
+        if (this.onboarding) {
+          // 引导收尾：画像 + 目录都已就绪
+          this.onboarding = false;
+          this.profileOpen = false;
+          this.showNotice({title: '🎉 初始化完成', body: '画像与目录已就绪。现在去「收件箱」贴几条链接，点「处理收件箱」试试吧。', kind: 'success'});
+        }
       } catch (e) {
         this.showNotice({title: '保存目录失败', body: this.escapeHtml(e.message), kind: 'danger'});
       } finally {
