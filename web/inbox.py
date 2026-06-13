@@ -27,8 +27,13 @@ _UPLOAD_EXTS = _DOC_EXTS | _MEDIA_EXTS
 _UPLOAD_MAX_BYTES = 300 * 1024 * 1024  # 300MB（视频可能较大）
 
 
-def save_uploaded_to_inbox(filename: str, data: bytes) -> dict:
-    """把上传的本地文件存进收件箱目录，之后「处理收件箱」由 pdf/docx fetcher 抽取 → 消化 → 归位。"""
+def save_uploaded_to_inbox(filename: str, data: bytes, use_model: bool = False) -> dict:
+    """把上传的本地文件存进收件箱目录，之后「处理收件箱」抽取/识别 → 消化 → 归位。
+
+    use_model 仅对 PDF/Word 生效：True 表示用户选了「大模型识别」（更准、能读扫描件/图表），
+    此时写一个同名 .fetch 旁标，scan.py 据此把该文档改派到 media（豆包多模态）而非本地抽取。
+    图片/视频本来就走 media，与该开关无关。
+    """
     name = (filename or "").strip()
     ext = ("." + name.rsplit(".", 1)[-1].lower()) if "." in name else ""
     if ext not in _UPLOAD_EXTS:
@@ -49,7 +54,17 @@ def save_uploaded_to_inbox(filename: str, data: bytes) -> dict:
         target = inbox_path / f"{stem}-{n}{ext}"
         n += 1
     target.write_bytes(data)
-    return {"file": str(target.relative_to(VAULT_ROOT)), "name": target.name}
+
+    is_doc = ext in _DOC_EXTS
+    parser = "本地抽取"
+    if is_doc and use_model:
+        # 旁标以 "." 开头，scan 会跳过它本身，仅作为路由提示
+        (inbox_path / ("." + target.name + ".fetch")).write_text("media", encoding="utf-8")
+        parser = "大模型识别"
+    elif not is_doc:
+        parser = "大模型识别"  # 图片/视频固定走多模态
+
+    return {"file": str(target.relative_to(VAULT_ROOT)), "name": target.name, "parser": parser}
 
 
 def add_to_inbox(text: str) -> dict:

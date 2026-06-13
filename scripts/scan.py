@@ -28,6 +28,22 @@ ATTACHMENT_EXTS = {
 }
 
 
+# 上传时若用户为 PDF/Word 选了「大模型识别」，收件箱里会有同名旁标文件
+#   .<原文件名>.fetch   内容是要改派的 fetcher 名（如 media）
+# scan 时据此覆盖按扩展名的默认路由。旁标以 "." 开头，本身不会被当作待处理项。
+_FETCH_OVERRIDE_SUFFIX = ".fetch"
+_KNOWN_FETCHERS = {"github", "wechat", "webpage", "douyin", "pdf", "docx", "media"}
+
+
+def _fetch_override(path: Path) -> Optional[str]:
+    """读 .<name>.fetch 旁标，返回其中的 fetcher 名（合法才返回），无则 None。"""
+    sidecar = path.with_name("." + path.name + _FETCH_OVERRIDE_SUFFIX)
+    if not sidecar.is_file():
+        return None
+    name = sidecar.read_text(encoding="utf-8").strip()
+    return name if name in _KNOWN_FETCHERS else None
+
+
 @dataclass(frozen=True)
 class WorkItem:
     kind: str  # url | attachment
@@ -85,13 +101,14 @@ def scan_inbox(vault_root: Path, inbox_dir: str) -> list[WorkItem]:
                     )
                 )
         elif path.is_file() and path.suffix.lower() in ATTACHMENT_EXTS:
+            fetcher = _fetch_override(path) or ATTACHMENT_EXTS[path.suffix.lower()]
             items.append(
                 WorkItem(
                     kind="attachment",
                     target=str(path),
                     source_file=rel,
                     raw_line="",
-                    fetcher=ATTACHMENT_EXTS[path.suffix.lower()],
+                    fetcher=fetcher,
                 )
             )
 

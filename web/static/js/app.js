@@ -33,6 +33,8 @@ function vaultApp() {
     inboxInput: '',          // app 内录入框
     inboxAdding: false,
     inboxUploading: false,   // 本地文件上传中
+    docParseMode: 'local',   // PDF/Word 解析方式：local=本地抽取(快·免费) / model=大模型识别(更准)
+    uploadedFiles: [],       // 本次已上传文件的预览：{name, file(相对路径), parser, ok}
     // 笔记轻量编辑
     editingNote: false,
     editBody: '',
@@ -920,22 +922,25 @@ function vaultApp() {
       event.target.value = '';   // 重置，便于再次选同名文件
       if (!files.length) return;
       this.inboxUploading = true;
+      const useModel = this.docParseMode === 'model';
       let ok = 0;
       try {
         for (const f of files) {
           const fd = new FormData();
           fd.append('file', f);
+          fd.append('use_model', useModel ? 'true' : 'false');
           const r = await fetch('/api/inbox/upload', {method: 'POST', body: fd});
-          if (r.ok) { ok++; }
-          else {
+          if (r.ok) {
+            ok++;
+            const d = await r.json().catch(() => ({}));
+            // 预览：让用户看到文件落到哪、用什么方式解析，确认可以「开始处理」
+            this.uploadedFiles.unshift({name: d.name || f.name, file: d.file || '', parser: d.parser || '', ok: true});
+          } else {
             const e = await r.json().catch(() => ({}));
-            this.showNotice({title: '上传失败：' + this.escapeHtml(f.name), body: this.escapeHtml(e.detail || ('HTTP ' + r.status)), kind: 'danger'});
+            this.uploadedFiles.unshift({name: f.name, file: '', parser: this.escapeHtml(e.detail || ('HTTP ' + r.status)), ok: false});
           }
         }
-        if (ok) {
-          this.loadTree();
-          this.showNotice({title: `已上传 ${ok} 个文件`, body: '已存入收件箱，点「开始处理」即抽取 → 消化 → 归位。', kind: 'info'});
-        }
+        if (ok) this.loadTree();   // 收件箱新增文件，刷新文件树
       } finally {
         this.inboxUploading = false;
       }

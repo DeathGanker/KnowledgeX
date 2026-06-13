@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fastapi import FastAPI, File, HTTPException, Query, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -558,12 +558,18 @@ def api_inbox_add(req: InboxAddRequest) -> JSONResponse:
 
 
 @app.post("/api/inbox/upload")
-async def api_inbox_upload(file: UploadFile = File(...)) -> JSONResponse:
-    """上传本地文件（PDF / Word）到收件箱，之后「处理收件箱」抽取 → 消化 → 归位。"""
+async def api_inbox_upload(
+    file: UploadFile = File(...),
+    use_model: bool = Form(False),
+) -> JSONResponse:
+    """上传本地文件（PDF / Word / 图片 / 视频）到收件箱，之后「处理收件箱」抽取/识别 → 消化 → 归位。
+
+    use_model：PDF/Word 是否改用大模型识别（更准、能读扫描件/图表）；图片/视频不受此开关影响。
+    """
     from web import inbox
     data = await file.read()
     try:
-        return JSONResponse(inbox.save_uploaded_to_inbox(file.filename, data))
+        return JSONResponse(inbox.save_uploaded_to_inbox(file.filename, data, use_model=use_model))
     except ValueError as e:
         raise HTTPException(400, str(e))
 

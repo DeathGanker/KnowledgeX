@@ -1,9 +1,12 @@
-"""图片 / 视频 → 火山方舟（豆包）多模态：Files API 上传 + Responses API 理解 → 文字材料。
+"""图片 / 视频 / 文档 → 火山方舟（豆包）多模态：Files API 上传 + Responses API 理解 → 文字材料。
 
 参考自 LocateAnything/ark_client.py 跑通的视频流程：
-  上传(/files) → 轮询 active → /responses(input_image|input_video + input_text) → 取 output 文本
-不本地 OCR，直接用模型读图/读视频，产出供 digest 整理成笔记的原始材料。
+  上传(/files) → 轮询 active → /responses(input_image|input_video|input_file + input_text) → 取 output 文本
+不本地 OCR，直接用模型读图/读视频/读文档，产出供 digest 整理成笔记的原始材料。
 需在 .env 配 VISION_MODEL（豆包视觉/视频接入点 ID）；未配则跳过该文件。
+
+PDF/Word 默认走本地抽取（pdf/docx fetcher，快且免费）；仅当用户在上传时选「大模型识别」，
+收件箱里写入 .fetch 旁标，scan.py 据此把该文档改派到本 media fetcher（更准、能读扫描件/图表）。
 """
 from __future__ import annotations
 
@@ -16,11 +19,14 @@ import requests
 from fetchers.base import FetcherResult, failed, skipped, staged
 
 _VIDEO_EXTS = {".mp4", ".mov", ".m4v", ".webm", ".avi", ".mkv"}
+_IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp"}
 _MIME = {
     ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp",
     ".gif": "image/gif", ".bmp": "image/bmp",
     ".mp4": "video/mp4", ".mov": "video/quicktime", ".m4v": "video/x-m4v",
     ".webm": "video/webm", ".avi": "video/x-msvideo", ".mkv": "video/x-matroska",
+    ".pdf": "application/pdf", ".doc": "application/msword",
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 }
 
 _EXTRACT_PROMPT = (
@@ -47,7 +53,14 @@ def fetch(file_path: str, *, config: dict) -> FetcherResult:
 
     ext = p.suffix.lower()
     is_video = ext in _VIDEO_EXTS
-    content_type = "input_video" if is_video else "input_image"
+    is_image = ext in _IMAGE_EXTS
+    if is_video:
+        content_type, kind = "input_video", "视频"
+    elif is_image:
+        content_type, kind = "input_image", "图片"
+    else:
+        # PDF / Word 等文档：走文档理解（能读扫描件/图表/复杂排版，本地抽取做不到）
+        content_type, kind = "input_file", "文档"
     mime = _MIME.get(ext, "application/octet-stream")
     headers = {"Authorization": f"Bearer {api_key}"}
     timeout = int(vc.get("timeout_seconds", 300))
@@ -105,7 +118,7 @@ def fetch(file_path: str, *, config: dict) -> FetcherResult:
     if not text:
         return failed("media", file_path, "视觉模型未返回可用内容")
 
-    kind = "视频" if is_video else "图片"
+    media_type = "video" if is_video else ("image" if is_image else "document")
     content = f"# {p.stem}\n\n> 来源：本地{kind}「{p.name}」，经豆包视觉模型识别\n\n{text}"
     return staged(fetcher="media", source=file_path, title=p.stem, content=content,
-                  meta={"media_type": "video" if is_video else "image", "file_id": file_id})
+                  meta={"media_type": media_type, "file_id": file_id})
