@@ -65,6 +65,12 @@ def fetch(file_path: str, *, config: dict) -> FetcherResult:
     headers = {"Authorization": f"Bearer {api_key}"}
     timeout = int(vc.get("timeout_seconds", 300))
 
+    # 国内豆包默认绕过系统代理（与 llm/embedding 的 bypass_system_proxy 一致）：
+    # 裸 requests 会吃 HTTPS_PROXY，海外代理转发 Ark 调用易 403/超时。
+    sess = requests.Session()
+    if vc.get("bypass_system_proxy", False):
+        sess.trust_env = False
+
     try:
         # 1) 上传到 Files API（视频附抽帧 fps）
         with open(p, "rb") as fh:
@@ -72,8 +78,9 @@ def fetch(file_path: str, *, config: dict) -> FetcherResult:
             data = {"purpose": "user_data"}
             if is_video:
                 data["preprocess_configs[video][fps]"] = str(vc.get("fps", 1.0))
-            r = requests.post(f"{base_url}/files", headers=headers, files=files, data=data, timeout=timeout)
-        r.raise_for_status()
+            r = sess.post(f"{base_url}/files", headers=headers, files=files, data=data, timeout=timeout)
+        if r.status_code // 100 != 2:
+            return failed("media", file_path, f"上传失败 HTTP {r.status_code}：{r.text[:300]}")
         file_id = r.json().get("id")
         if not file_id:
             return failed("media", file_path, f"上传未返回 file id：{r.text[:200]}")
@@ -81,7 +88,7 @@ def fetch(file_path: str, *, config: dict) -> FetcherResult:
         # 2) 轮询到 active（服务端抽帧/预处理）
         deadline = time.time() + int(vc.get("active_timeout_seconds", 180))
         while True:
-            st = requests.get(f"{base_url}/files/{file_id}", headers=headers, timeout=30).json().get("status", "")
+            st = sess.get(f"{base_url}/files/{file_id}", headers=headers, timeout=30).json().get("status", "")
             if st == "active":
                 break
             if st in ("failed", "error", "expired"):
@@ -99,10 +106,11 @@ def fetch(file_path: str, *, config: dict) -> FetcherResult:
             ]}],
             "max_output_tokens": int(vc.get("max_output_tokens", 4096)),
         }
-        rr = requests.post(f"{base_url}/responses",
-                           headers={**headers, "Content-Type": "application/json"},
-                           json=payload, timeout=timeout)
-        rr.raise_for_status()
+        rr = sess.post(f"{base_url}/responses",
+                       headers={**headers, "Content-Type": "application/json"},
+                       json=payload, timeout=timeout)
+        if rr.status_code // 100 != 2:
+            return failed("media", file_path, f"理解请求失败 HTTP {rr.status_code}：{rr.text[:300]}")
         body = rr.json()
     except Exception as e:
         return failed("media", file_path, f"视觉模型调用失败：{e}")

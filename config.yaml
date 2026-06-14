@@ -58,6 +58,7 @@ vision:
   model: ""                                # 视觉/视频接入点 ID（如 doubao-1.5-vision-pro 的 ep-…）
   base_url: https://ark.cn-beijing.volces.com/api/v3
   api_key_env: ARK_API_KEY
+  bypass_system_proxy: true                # 国内豆包绕过系统代理（与 llm/embedding 一致；海外端点改 false）
   fps: 1.0                                  # 视频抽帧率（服务端按此采样）
   max_output_tokens: 4096
   timeout_seconds: 300
