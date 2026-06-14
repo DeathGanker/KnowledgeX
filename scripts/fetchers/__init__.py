@@ -6,6 +6,7 @@ from typing import Callable
 from fetchers import docx as docx_mod
 from fetchers import douyin as douyin_mod
 from fetchers import github as github_mod
+from fetchers import media as media_mod
 from fetchers import pdf as pdf_mod
 from fetchers import webpage as webpage_mod
 from fetchers import wechat as wechat_mod
@@ -19,6 +20,7 @@ REGISTRY: dict[str, Callable[..., FetcherResult]] = {
     "douyin": douyin_mod.fetch,
     "pdf": pdf_mod.fetch,
     "docx": docx_mod.fetch,
+    "media": media_mod.fetch,
 }
 
 
@@ -45,6 +47,8 @@ def dispatch(fetcher_name: str, target: str, *, config: dict) -> FetcherResult:
         return fn(target, max_pages=limits.get("pdf_max_pages", 30))
     if fetcher_name == "docx":
         return fn(target)
+    if fetcher_name == "media":
+        return fn(target, config=config)
     if fetcher_name == "douyin":
         return fn(target)
 

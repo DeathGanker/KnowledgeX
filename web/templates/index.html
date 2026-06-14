@@ -20,7 +20,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.min.css">
-  <link rel="stylesheet" href="/static/css/app.css?v=20260612h">
+  <link rel="stylesheet" href="/static/css/app.css?v=20260613a">
 </head>
 <body class="h-screen overflow-hidden">
 
@@ -462,6 +462,41 @@
             <span x-show="!inboxAdding">录入</span>
             <span x-show="inboxAdding" class="dots"><span></span><span></span><span></span></span>
           </button>
+        </div>
+        <!-- 上传本地文件：存进收件箱，由管道抽取/识别后消化 -->
+        <div class="mt-2">
+          <!-- PDF/Word 解析方式选择：本地抽取(快·免费) vs 大模型识别(更准) -->
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="eyebrow" style="color:var(--mute)">PDF / Word 解析：</span>
+            <button @click="docParseMode='local'" type="button"
+                    class="pill pill-sm" :class="docParseMode==='local' ? 'pill-primary' : ''"
+                    style="padding:2px 10px">本地抽取 · 快/免费</button>
+            <button @click="docParseMode='model'" type="button"
+                    class="pill pill-sm" :class="docParseMode==='model' ? 'pill-primary' : ''"
+                    style="padding:2px 10px">大模型识别 · 更准</button>
+            <span class="eyebrow" style="color:var(--canvas-mid)"
+                  x-text="docParseMode==='model' ? '扫描件/图表/精准信息推荐，需配 VISION_MODEL' : '纯文字 PDF/Word 足够'"></span>
+          </div>
+          <div class="flex items-center gap-2 mt-2">
+            <input type="file" x-ref="inboxFile" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.webp,.gif,.mp4,.mov,.m4v,.webm" multiple class="hidden" @change="uploadInboxFiles($event)">
+            <button @click="$refs.inboxFile.click()" :disabled="inboxUploading" class="pill pill-sm">
+              <span x-show="!inboxUploading">📎 上传文件（PDF / Word / 图片 / 视频）</span>
+              <span x-show="inboxUploading" class="dots"><span></span><span></span><span></span></span>
+            </button>
+            <span class="eyebrow" style="color:var(--canvas-mid)">图片/视频固定走豆包视觉识别（需配 VISION_MODEL）</span>
+          </div>
+          <!-- 上传结果预览：让用户看到文件落到哪、用什么方式解析，确认可以「开始处理」 -->
+          <div x-show="uploadedFiles.length" class="mt-2" style="border:1px solid var(--hair);border-radius:8px;padding:6px 10px;max-height:120px;overflow:auto">
+            <template x-for="(u, i) in uploadedFiles" :key="i">
+              <div class="flex items-center gap-2" style="font-size:12px;line-height:1.7">
+                <span x-text="u.ok ? '✓' : '✕'" :style="u.ok ? 'color:var(--accent-breeze)' : 'color:var(--accent-sunset)'"></span>
+                <span x-text="u.name" style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:14rem"></span>
+                <span x-show="u.ok" class="eyebrow" style="color:var(--mute)">→ <span x-text="u.file"></span> · <span x-text="u.parser"></span></span>
+                <span x-show="!u.ok" class="eyebrow" style="color:var(--accent-sunset)" x-text="u.parser"></span>
+              </div>
+            </template>
+            <div class="eyebrow mt-1" style="color:var(--canvas-mid)">已存入收件箱，点下方「开始处理」即抽取/识别 → 消化 → 归位。</div>
+          </div>
         </div>
       </div>
       <div class="log-stream" id="inbox-log">
@@ -938,7 +973,7 @@
 <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
-<script src="/static/js/graph.js?v=20260612h"></script>
-<script src="/static/js/app.js?v=20260612h"></script>
+<script src="/static/js/graph.js?v=20260613a"></script>
+<script src="/static/js/app.js?v=20260613a"></script>
 </body>
 </html>
