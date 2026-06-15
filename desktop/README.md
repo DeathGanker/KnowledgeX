@@ -48,9 +48,21 @@ npm run tauri:dev        # 拉起后端 + 打开桌面窗口（首次会编译 R
 | `package.json` | `tauri:dev` / `tauri:build` 脚本 + `@tauri-apps/cli` |
 | `start-backend.sh` | Tauri `beforeDevCommand`，前台启动 FastAPI（127.0.0.1:7346，免 token） |
 | `src-tauri/tauri.conf.json` | 窗口、`devUrl`、图标、bundle 配置 |
-| `src-tauri/src/main.rs` | 极简 Tauri 壳（无自定义 command） |
+| `src-tauri/src/main.rs` | Tauri 壳：全局快捷键 ⌘⇧C / 托盘 / 桌宠窗口 + 命令 `toggle_pet`·`set_clip_monitor`·`take_clip_image` |
 | `src-tauri/icons/` | 应用图标（来自 `assets/branding/icons/`） |
 | `dist/index.html` | 仅满足 `frontendDist`，dev 不用到 |
+
+## 桌宠投喂（桌面端特有）
+
+主窗口之外再开一个常驻置顶的「桌宠」小窗（`tauri.conf.json` 的 `pet` 窗口，加载 `/static/pet/`），作零摩擦投喂入口，全部复用现有 `/api/inbox/*` + `/api/jobs/*`，消化管道不改：
+
+- **⌘⇧C**：把剪贴板的链接/文字/图片投喂进收件箱。
+- **拖拽**：把链接或文件拖到桌宠身上。
+- **复制即投喂**（桌宠顶栏 👁，opt-in 默认关）：后台监听剪贴板，复制即弹「投喂卡」，10s 不点自动消失（不静默囤积）。
+- 投喂后桌宠实时显示「抓取→消化→归位→图谱生长」，并发 `knowledgex-digested` 事件通知主界面刷新文件树；主界面顶栏对应有 **🐾 桌宠**（显隐）与 **🕘 记录**（回溯抓取→归位，含原始链接）。
+- 剪贴板图片 → 编码 PNG → 上传 → 豆包视觉识别。
+
+> 剪贴板读取放在 Rust 后台线程（插件在主线程读会 panic）。改 `web/static/pet/*` 后记得碰 `tauri.conf.json` 里 pet 窗口 url 及 `index.html` 引用的 `?v=` 版本号，否则 webview 吃旧缓存。透明自由漂浮、复制密码类型跳过、`tauri:build` 打包成 .app 等为后续。
 
 ## 改端口
 

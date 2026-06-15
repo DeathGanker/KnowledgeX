@@ -35,6 +35,13 @@ function vaultApp() {
     inboxUploading: false,   // 本地文件上传中
     docParseMode: 'local',   // PDF/Word 解析方式：local=本地抽取(快·免费) / model=大模型识别(更准)
     uploadedFiles: [],       // 本次已上传文件的预览：{name, file(相对路径), parser, ok}
+    // 桌宠投喂 / 消化记录
+    isDesktop: false,        // Tauri 桌面端（有 __TAURI__）才显示「桌宠」按钮
+    historyOpen: false,
+    historyItems: [],
+    historyLoading: false,
+    digestToast: {show: false, title: '', path: '', dir: '', edges: 0},
+    _digestToastT: null,
     // 笔记轻量编辑
     editingNote: false,
     editBody: '',
@@ -944,6 +951,70 @@ function vaultApp() {
       } finally {
         this.inboxUploading = false;
       }
+    },
+
+    // ----------------- 桌宠 / 消化记录 -----------------
+
+    // x-init 调用：等 __TAURI__ 就绪后标记桌面端 + 挂「桌宠投喂消化完成」监听
+    initPetBridge(n = 0) {
+      const T = window.__TAURI__;
+      if (!T) { if (n < 100) setTimeout(() => this.initPetBridge(n + 1), 30); return; }
+      this.isDesktop = true;
+      if (T.event && T.event.listen) {
+        T.event.listen('knowledgex-digested', (ev) => {
+          const p = (ev && ev.payload) || {};
+          this.loadTree();          // 桌宠喂的内容已归位 → 刷新文件树
+          this.flashDigest(p);
+        });
+      }
+    },
+
+    // 顶栏按钮：显隐桌宠窗口（走 Rust 命令 toggle_pet，最稳）
+    async togglePet() {
+      const T = window.__TAURI__;
+      if (!T || !T.core) { this.showNotice({title: '桌宠仅桌面端可用', body: '请在 Tauri 桌面端中使用。', kind: 'info'}); return; }
+      try { await T.core.invoke('toggle_pet'); }
+      catch (e) { this.showNotice({title: '无法切换桌宠', body: this.escapeHtml(String(e)), kind: 'danger'}); }
+    },
+
+    // 消化完成的轻提示（非阻塞，点一下打开那篇笔记）
+    flashDigest(p) {
+      this.digestToast = {
+        show: true,
+        title: p.title || '已消化',
+        path: p.path || '',
+        dir: p.dir || '',
+        edges: p.edges || 0,
+      };
+      if (this._digestToastT) clearTimeout(this._digestToastT);
+      this._digestToastT = setTimeout(() => { this.digestToast.show = false; }, 6000);
+    },
+
+    openDigested() {
+      const p = this.digestToast.path;
+      this.digestToast.show = false;
+      if (p) this.openNote(p);
+    },
+
+    // 消化记录：从 state.json 读「抓取了什么 → 存到哪」
+    async openHistory() {
+      this.historyOpen = true;
+      this.historyLoading = true;
+      try {
+        const r = await fetch('/api/inbox/history?limit=80');
+        const d = await r.json();
+        this.historyItems = d.items || [];
+      } catch (e) {
+        this.showNotice({title: '记录加载失败', body: this.escapeHtml(e.message), kind: 'danger'});
+      } finally {
+        this.historyLoading = false;
+      }
+    },
+
+    openHistoryNote(path) {
+      if (!path) return;
+      this.historyOpen = false;
+      this.openNote(path);
     },
 
     // ----------------- 笔记轻量编辑 -----------------

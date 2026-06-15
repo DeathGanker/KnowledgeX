@@ -9,6 +9,7 @@
     "frontendDist": "../dist"
   },
   "app": {
+    "withGlobalTauri": true,
     "windows": [
       {
         "label": "main",
@@ -19,6 +20,21 @@
         "minHeight": 640,
         "decorations": true,
         "resizable": true
+      },
+      {
+        "label": "pet",
+        "title": "KnowledgeX 桌宠",
+        "url": "static/pet/index.html?v=20260615b",
+        "width": 300,
+        "height": 180,
+        "resizable": false,
+        "decorations": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "shadow": true,
+        "transparent": false,
+        "dragDropEnabled": false,
+        "visible": true
       }
     ],
     "security": {
