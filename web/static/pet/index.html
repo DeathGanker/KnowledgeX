@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KnowledgeX 桌宠</title>
+  <link rel="stylesheet" href="/static/pet/pet.css?v=20260615b" />
+</head>
+<body>
+  <div id="pet" class="pet">
+    <!-- 顶栏：可拖动窗口 + 关闭 -->
+    <div class="bar" data-tauri-drag-region>
+      <span class="bar-title" data-tauri-drag-region>投喂 · KnowledgeX</span>
+      <span class="bar-actions">
+        <button id="watch" class="bar-watch" title="复制即投喂：关（点击开）">👁</button>
+        <button id="close" class="bar-close" title="收起（托盘可再唤出）">×</button>
+      </span>
+    </div>
+
+    <div class="body">
+      <!-- 左：星座桌宠 -->
+      <canvas id="sky" width="208" height="208"></canvas>
+
+      <!-- 右：随状态切换的面板 -->
+      <div class="side">
+        <!-- idle 提示 -->
+        <div id="hint" class="panel hint">
+          把<b>链接 / 文件</b>拖进来<br />
+          或按 <kbd>⌘⇧C</kbd> 投喂剪贴板
+        </div>
+
+        <!-- 投喂卡（快捷键捕获时） -->
+        <div id="card" class="panel card hidden">
+          <div class="card-head">
+            <span id="card-badge" class="badge">链接</span>
+            <span id="card-src" class="src"></span>
+          </div>
+          <div id="card-preview" class="preview"></div>
+          <div class="actions">
+            <button id="feed" class="btn primary">喂它 <span id="ring" class="ring">10</span></button>
+            <button id="dismiss" class="btn">取消</button>
+          </div>
+        </div>
+
+        <!-- 消化中 -->
+        <div id="status" class="panel status hidden">
+          <div id="stage" class="stage">消化中…</div>
+          <div id="detail" class="detail"></div>
+        </div>
+
+        <!-- 结果 -->
+        <div id="result" class="panel result hidden"></div>
+      </div>
+    </div>
+
+    <!-- 拖放遮罩 -->
+    <div id="drop" class="drop hidden">松手投喂 🍃</div>
+
+    <!-- 文件选择兜底（macOS 拖原生文件拿不到字节时用） -->
+    <input id="file-input" type="file" multiple class="hidden" />
+  </div>
+
+  <script src="/static/pet/pet.js?v=20260615b"></script>
+</body>
+</html>

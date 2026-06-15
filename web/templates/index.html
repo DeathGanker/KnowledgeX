@@ -20,11 +20,11 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.min.css">
-  <link rel="stylesheet" href="/static/css/app.css?v=20260613a">
+  <link rel="stylesheet" href="/static/css/app.css?v=20260615a">
 </head>
 <body class="h-screen overflow-hidden">
 
-<div x-data="vaultApp()" x-init="initTheme(); loadTree(); loadMiniGraph(); loadActiveJobs(); checkOnboarding()" class="h-screen flex flex-col"
+<div x-data="vaultApp()" x-init="initTheme(); loadTree(); loadMiniGraph(); loadActiveJobs(); checkOnboarding(); initPetBridge()" class="h-screen flex flex-col"
      :style="'--tree-w:' + treeW + 'px; --note-w:' + noteW + 'px'">
 
   <!-- 顶栏 -->
@@ -44,6 +44,12 @@
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
         <span class="hidden sm:inline">处理收件箱</span>
         <span x-show="isJobRunning('inbox')" class="job-dot"></span>
+      </button>
+      <button @click="openHistory()" class="pill pill-sm" title="投喂 / 消化记录：抓了什么、消化后存到哪">
+        🕘 <span class="hidden sm:inline">记录</span>
+      </button>
+      <button x-show="isDesktop" @click="togglePet()" class="pill pill-sm" title="显示 / 隐藏桌宠投喂窗口">
+        🐾 <span class="hidden sm:inline">桌宠</span>
       </button>
       <button @click="openStars()" class="pill pill-sm" :class="isJobRunning('stars') ? 'pill-running' : ''" title="导入 GitHub starred 仓库，消化成笔记">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
@@ -520,6 +526,74 @@
     </div>
   </div>
 
+  <!-- 投喂 / 消化记录 -->
+  <div x-show="historyOpen" x-transition.opacity class="modal-backdrop" @click.self="historyOpen=false">
+    <div class="modal-panel fade-in">
+      <div class="hair-b p-3 flex items-center justify-between shrink-0">
+        <span class="eyebrow">◆ 消化记录 · 抓了什么 → 存到哪</span>
+        <button @click="historyOpen=false"
+                style="color:var(--mute);font-size:20px;line-height:1;background:none;border:none;cursor:pointer">×</button>
+      </div>
+      <div style="flex:1;overflow-y:auto;min-height:0">
+        <template x-if="historyLoading">
+          <div class="dots" style="padding:14px"><span></span><span></span><span></span></div>
+        </template>
+        <template x-if="!historyLoading && !historyItems.length">
+          <div style="color:var(--mute);padding:14px">还没有消化记录。投喂点东西试试～</div>
+        </template>
+        <template x-for="(it, i) in historyItems" :key="i">
+          <div style="padding:9px 14px;border-bottom:1px solid var(--hairline)">
+            <!-- 行1：状态 · 标题 · 时间 -->
+            <div style="display:flex;align-items:baseline;gap:8px">
+              <span style="flex:0 0 14px;text-align:center;font-weight:700;font-size:12px"
+                    :style="it.status === 'processed' ? 'color:var(--accent-breeze)' : 'color:var(--accent-sunset)'"
+                    x-text="it.status === 'processed' ? '✓' : '✕'"></span>
+              <span style="flex:1;min-width:0;font-size:13px;font-weight:500;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis"
+                    :title="it.title || it.url" x-text="it.title || it.url || '(无标题)'"></span>
+              <span class="mono" style="flex:0 0 auto;font-size:10px;color:var(--mute)"
+                    x-text="(it.at || '').slice(5, 16).replace('T', ' ')"></span>
+            </div>
+            <!-- 行2：原始来源（http 链接可点开回溯；本地文件显示路径） -->
+            <div x-show="it.url" style="display:flex;align-items:center;gap:8px;margin-top:4px;padding-left:22px;min-width:0">
+              <span class="mono" style="flex:0 0 auto;font-size:10px;text-transform:uppercase;color:var(--accent-twilight)" x-text="it.fetcher"></span>
+              <a x-show="it.url && it.url.startsWith('http')" :href="it.url" target="_blank" rel="noopener" @click.stop
+                 class="mono" style="flex:1;min-width:0;font-size:11px;color:var(--accent-breeze);text-decoration:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"
+                 :title="it.url" x-text="it.url"></a>
+              <span x-show="it.url && !it.url.startsWith('http')"
+                    class="mono" style="flex:1;min-width:0;font-size:11px;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis"
+                    :title="it.url" x-text="it.url"></span>
+            </div>
+            <!-- 行3：消化后存到哪 / 失败原因 -->
+            <div style="display:flex;align-items:center;gap:8px;margin-top:4px;padding-left:22px;min-width:0">
+              <template x-if="it.status === 'processed' && it.output_path">
+                <a @click.prevent="openHistoryNote(it.output_path)" :title="it.output_path"
+                   style="flex:1;min-width:0;font-size:12px;color:var(--body);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"
+                   x-text="'→ ' + it.output_path"></a>
+              </template>
+              <template x-if="it.status === 'failed'">
+                <span :title="it.error" style="flex:1;min-width:0;font-size:12px;color:var(--accent-sunset);white-space:nowrap;overflow:hidden;text-overflow:ellipsis"
+                      x-text="'✕ ' + (it.error || '抓取失败') + '（收件箱可重试）'"></span>
+              </template>
+            </div>
+          </div>
+        </template>
+      </div>
+      <div class="hair-t p-3 flex items-center justify-between shrink-0">
+        <span class="eyebrow" x-text="historyItems.length + ' 条'"></span>
+        <button @click="openHistory()" class="pill pill-sm">刷新</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 桌宠消化完成的轻提示（非阻塞，点开打开那篇笔记） -->
+  <div x-show="digestToast.show" x-transition.opacity @click="openDigested()"
+       style="position:fixed;right:18px;bottom:18px;z-index:70;max-width:20rem;cursor:pointer;background:var(--canvas-card);border:1px solid var(--accent-sunset);border-radius:10px;padding:10px 14px;box-shadow:0 6px 24px rgba(0,0,0,0.4)">
+    <div style="font-size:13px;color:var(--ink);font-weight:600">🍃 已消化 · <span x-text="digestToast.title"></span></div>
+    <div class="eyebrow" style="color:var(--mute);margin-top:3px">
+      → <span x-text="digestToast.dir || '已归位'"></span><template x-if="digestToast.edges"><span style="color:var(--accent-sunset-soft)"> · 图谱 +<span x-text="digestToast.edges"></span> 边</span></template> · 点开 →
+    </div>
+  </div>
+
   <!-- 首次使用引导 -->
   <div x-show="onboardOpen" x-transition.opacity class="modal-backdrop" style="z-index:60">
     <div class="modal-panel fade-in" style="max-width:30rem">
@@ -973,7 +1047,7 @@
 <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
-<script src="/static/js/graph.js?v=20260613a"></script>
-<script src="/static/js/app.js?v=20260613a"></script>
+<script src="/static/js/graph.js?v=20260615a"></script>
+<script src="/static/js/app.js?v=20260615a"></script>
 </body>
 </html>

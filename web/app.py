@@ -574,6 +574,13 @@ async def api_inbox_upload(
         raise HTTPException(400, str(e))
 
 
+@app.get("/api/inbox/history")
+def api_inbox_history(limit: int = Query(50)) -> JSONResponse:
+    """投喂/消化记录：抓取了什么、消化后存到哪（读 state.json）。"""
+    from web import inbox
+    return JSONResponse({"items": inbox.recent_items(limit)})
+
+
 # ---------------- 笔记轻量编辑 ----------------
 
 class NoteSaveRequest(BaseModel):

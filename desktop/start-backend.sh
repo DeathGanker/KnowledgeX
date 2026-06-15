@@ -25,7 +25,7 @@ export DESKTOP_PORT="$PORT"
 # 让 DeepWiki、GitHub 抓取等海外出站走代理；国内豆包/embedding 用 mounts 硬禁代理，不受影响。
 # （python 端 load_dotenv 也会读，这里再导出一次以覆盖子进程并在启动日志里可见。）
 for _k in HTTPS_PROXY HTTP_PROXY ALL_PROXY; do
-  _v=$(grep -E "^${_k}=" .env 2>/dev/null | head -1 | cut -d= -f2-)
+  _v=$(grep -E "^${_k}=" .env 2>/dev/null | head -1 | cut -d= -f2- || true)
   if [[ -n "${_v:-}" ]]; then export "${_k}=${_v}"; echo "▎代理透传 ${_k}=${_v}"; fi
 done
 

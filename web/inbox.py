@@ -96,6 +96,32 @@ def add_to_inbox(text: str) -> dict:
     return {"file": str(target.relative_to(VAULT_ROOT)), "added": text}
 
 
+def recent_items(limit: int = 50) -> list[dict]:
+    """投喂/消化记录：从 state.json 读「抓取了什么 → 消化后存到哪」。
+
+    只取已消化(processed)与失败(failed，可重试)的条目，按时间倒序——给桌面端做历史记录用，
+    解决「喂进去后找不到消化产物」的问题。
+    """
+    from scripts.state import load_state
+
+    rows: list[dict] = []
+    for key, rec in load_state().items():
+        if rec.status not in ("processed", "failed"):
+            continue
+        rows.append({
+            "key": key,
+            "title": rec.title or "",
+            "url": rec.url or "",
+            "fetcher": rec.fetcher or "",
+            "status": rec.status,
+            "output_path": rec.output_path or "",
+            "error": rec.error or "",
+            "at": rec.processed_at or rec.fetched_at or "",
+        })
+    rows.sort(key=lambda r: r["at"], reverse=True)
+    return rows[: max(1, min(limit, 200))]
+
+
 def _sse(event: str, data: dict) -> str:
     return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
 
