@@ -16,6 +16,7 @@
     if (t) cb(t);
     else if (n < 100) setTimeout(() => whenTauri(cb, n + 1), 30);
   };
+  const AUTO_HIDE_ON_IDLE = true;
 
   // ---------- DOM ----------
   const $ = (id) => document.getElementById(id);
@@ -31,6 +32,28 @@
 
   function setPanel(name) {
     for (const k in panels) panels[k].classList.toggle("hidden", k !== name);
+  }
+
+  function hidePetWindow() {
+    const t = getT();
+    if (!t) return;
+    if (t.core) {
+      t.core.invoke("hide_pet").catch(() => {
+        try { t.window.getCurrentWindow().hide(); } catch {}
+      });
+      return;
+    }
+    try { t.window.getCurrentWindow().hide(); } catch {}
+  }
+
+  function holdPetPrompt() {
+    const t = getT();
+    if (t && t.core) t.core.invoke("hold_pet_prompt").catch(() => {});
+  }
+
+  function releasePetPrompt() {
+    const t = getT();
+    if (t && t.core) t.core.invoke("release_pet_prompt").catch(() => {});
   }
 
   // ---------- 状态 → 动画目标 ----------
@@ -123,7 +146,10 @@
   function flashHint(msg) {
     clearTimeout(hintTimer);
     panels.hint.textContent = msg; setPanel("hint"); setState("idle");
-    hintTimer = setTimeout(backToIdle, 2600);
+    hintTimer = setTimeout(() => {
+      backToIdle();
+      if (AUTO_HIDE_ON_IDLE) hidePetWindow();
+    }, 2600);
   }
 
   // ---------- 投喂卡（快捷键捕获） ----------
@@ -139,7 +165,7 @@
     let n = 10; ring.textContent = n;
     countdown = setInterval(() => {
       n -= 1; ring.textContent = n > 0 ? n : "";
-      if (n <= 0) dismissCard();
+      if (n <= 0) { releasePetPrompt(); dismissCard(); hidePetWindow(); }
     }, 1000);
   }
   function dismissCard() { clearCountdown(); pending = null; backToIdle(); }
@@ -148,15 +174,16 @@
     clearCountdown();
     const p = pending; pending = null;
     if (!p) return;
+    holdPetPrompt();
     if (p.kind === "image") feedImage();
     else if (p.text) feedText(p.text);
   };
-  $("dismiss").onclick = dismissCard;
-  $("close").onclick = () => { const t = getT(); if (t) try { t.window.getCurrentWindow().hide(); } catch {} };
+  $("dismiss").onclick = () => { releasePetPrompt(); dismissCard(); hidePetWindow(); };
+  $("close").onclick = () => { releasePetPrompt(); hidePetWindow(); };
 
-  // ---------- 复制自动监听开关（opt-in，默认关，localStorage 记忆） ----------
+  // ---------- 复制自动监听开关（默认开，localStorage 记忆；托盘也可切换） ----------
   const watchBtn = $("watch");
-  let watchOn = false;
+  let watchOn = true;
   function applyWatch(on, persist) {
     watchOn = on;
     if (watchBtn) {
@@ -282,7 +309,13 @@
       // 通知主界面：刷新文件树 + 轻提示（path 为 vault 相对路径，主界面可直接打开）
       const t = getT();
       if (t && t.event && t.event.emit) t.event.emit("knowledgex-digested", { path: placed || "", title, dir, edges });
-      setTimeout(() => { if (state === "done") backToIdle(); }, 6000);
+      setTimeout(() => {
+        if (state === "done") {
+          releasePetPrompt();
+          backToIdle();
+          if (AUTO_HIDE_ON_IDLE) hidePetWindow();
+        }
+      }, 6000);
     } else if (failed >= 1 || errMsg) {
       showFail(errMsg || "抓取失败");
     } else if (skipped >= 1) {
@@ -299,7 +332,13 @@
       `<div class="where">${esc(msg)}</div>` +
       `<div class="where">已留在收件箱，可重试</div>`;
     setPanel("result");
-    setTimeout(() => { if (state === "fail") backToIdle(); }, 7000);
+    setTimeout(() => {
+      if (state === "fail") {
+        releasePetPrompt();
+        backToIdle();
+        if (AUTO_HIDE_ON_IDLE) hidePetWindow();
+      }
+    }, 7000);
   }
 
   // ---------- 拖放投喂（链接稳；原生文件在 macOS WKWebView 下可能拿不到字节，用「＋ 文件」兜底） ----------
@@ -334,10 +373,13 @@
         showCard(p);
       });
     }
-    // 恢复「复制自动监听」开关并同步给 Rust
-    let saved = false;
-    try { saved = localStorage.getItem("kx_clip_watch") === "1"; } catch {}
-    if (saved) applyWatch(true, false);
+    // 恢复「复制自动监听」开关并同步给 Rust；未设置时默认开启。
+    let saved = true;
+    try {
+      const raw = localStorage.getItem("kx_clip_watch");
+      saved = raw == null ? true : raw === "1";
+    } catch {}
+    applyWatch(saved, false);
   });
 
   backToIdle();

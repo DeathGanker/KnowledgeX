@@ -1,7 +1,7 @@
 // 个人知识助手 桌面端：Tauri 壳 + 桌宠投喂。
 // 主窗口(main) 复用 FastAPI 前端；桌宠窗口(pet) 是「投喂」入口：
 //   - 全局快捷键 ⌘/Ctrl+Shift+C：读剪贴板（文本/图片）→ 弹「投喂卡」
-//   - 复制自动监听（opt-in，默认关）：后台轮询剪贴板，变化即弹卡
+//   - 复制自动监听（默认开，可从托盘关闭）：后台轮询剪贴板，变化即弹卡
 //   - 拖拽文件/链接到桌宠：前端 HTML5 拖放处理
 //   - 投喂复用现有后端 /api/inbox/* + /api/jobs/*，消化管道一行不改
 // 注意：剪贴板读取必须在「非主线程、事件循环已起」时进行，否则插件会 panic，
@@ -15,7 +15,7 @@ use std::time::Duration;
 
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, Position};
 use tauri_plugin_clipboard_manager::ClipboardExt;
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
@@ -28,6 +28,13 @@ struct ClipMonitor {
     last: Mutex<String>,
 }
 
+/// 投喂提示窗口的生命周期控制：
+/// 每次复制触发都会生成新 token 并安排兜底隐藏；投喂中则 hold，避免进度窗口被收起。
+struct PetPrompt {
+    token: std::sync::atomic::AtomicU64,
+    hold: AtomicBool,
+}
+
 fn classify(trimmed: &str) -> &'static str {
     if (trimmed.starts_with("http://") || trimmed.starts_with("https://"))
         && !trimmed.chars().any(|c| c.is_whitespace())
@@ -38,22 +45,58 @@ fn classify(trimmed: &str) -> &'static str {
     }
 }
 
-/// 显示桌宠并发「投喂卡」事件（文本/链接）。focus=true 抢焦点（快捷键用）；监听用 false 不打扰。
-fn emit_text_capture(app: &AppHandle, trimmed: &str, focus: bool) {
-    if let Ok(mut g) = app.state::<ClipMonitor>().last.lock() {
-        *g = trimmed.to_string();
-    }
+/// 显示投喂提示。默认贴近主屏幕右上角，避免从屏幕中央遮挡当前工作区。
+fn show_pet(app: &AppHandle, focus: bool) {
     if let Some(pet) = app.get_webview_window("pet") {
+        if let (Ok(Some(monitor)), Ok(size)) = (pet.primary_monitor(), pet.outer_size()) {
+            let work = monitor.work_area();
+            let x = work.position.x + work.size.width as i32 - size.width as i32 - 24;
+            let y = work.position.y + 40;
+            let _ = pet.set_position(Position::Physical(PhysicalPosition::new(x.max(work.position.x), y)));
+        }
         let _ = pet.show();
         if focus {
             let _ = pet.set_focus();
         }
     }
+}
+
+fn hide_pet_window(app: &AppHandle) {
+    if let Some(pet) = app.get_webview_window("pet") {
+        let _ = pet.hide();
+    }
+}
+
+fn schedule_pet_auto_hide(app: &AppHandle) {
+    let token = {
+        let state = app.state::<PetPrompt>();
+        state.hold.store(false, Ordering::Relaxed);
+        state.token.fetch_add(1, Ordering::Relaxed) + 1
+    };
+    let app = app.clone();
+    thread::spawn(move || {
+        thread::sleep(Duration::from_secs(12));
+        let state = app.state::<PetPrompt>();
+        let is_current = state.token.load(Ordering::Relaxed) == token;
+        let is_held = state.hold.load(Ordering::Relaxed);
+        if is_current && !is_held {
+            hide_pet_window(&app);
+        }
+    });
+}
+
+/// 显示桌宠并发「投喂卡」事件（文本/链接）。focus=true 抢焦点（快捷键用）；监听用 false 不打断输入焦点。
+fn emit_text_capture(app: &AppHandle, trimmed: &str, focus: bool) {
+    if let Ok(mut g) = app.state::<ClipMonitor>().last.lock() {
+        *g = trimmed.to_string();
+    }
+    show_pet(app, focus);
     let preview: String = trimmed.chars().take(240).collect();
     let _ = app.emit(
         "capture-propose",
         serde_json::json!({ "kind": classify(trimmed), "text": trimmed, "preview": preview }),
     );
+    schedule_pet_auto_hide(app);
 }
 
 /// RGBA8 → PNG 字节（剪贴板图片是裸 RGBA，上传前编码成 PNG）。
@@ -91,14 +134,12 @@ fn propose_from_clipboard(app: &AppHandle) {
             if let Ok(mut g) = app.state::<ClipImage>().0.lock() {
                 *g = Some(bytes);
             }
-            if let Some(pet) = app.get_webview_window("pet") {
-                let _ = pet.show();
-                let _ = pet.set_focus();
-            }
+            show_pet(&app, true);
             let _ = app.emit(
                 "capture-propose",
                 serde_json::json!({ "kind": "image", "text": "", "preview": "📷 剪贴板图片" }),
             );
+            schedule_pet_auto_hide(&app);
             return;
         }
         let _ = app.emit("capture-propose", serde_json::json!({ "kind": "empty" }));
@@ -112,13 +153,32 @@ fn toggle_pet(app: AppHandle) {
         if matches!(pet.is_visible(), Ok(true)) {
             let _ = pet.hide();
         } else {
-            let _ = pet.show();
-            let _ = pet.set_focus();
+            show_pet(&app, true);
         }
     }
 }
 
-/// 复制自动监听开关（pet 设置里切换，默认关）。
+/// 收起投喂提示。由 pet 前端在倒计时、取消、完成、失败后调用，避免窗口残留在屏幕上。
+#[tauri::command]
+fn hide_pet(app: AppHandle) {
+    if let Some(state) = app.try_state::<PetPrompt>() {
+        state.token.fetch_add(1, Ordering::Relaxed);
+        state.hold.store(false, Ordering::Relaxed);
+    }
+    hide_pet_window(&app);
+}
+
+#[tauri::command]
+fn hold_pet_prompt(state: tauri::State<PetPrompt>) {
+    state.hold.store(true, Ordering::Relaxed);
+}
+
+#[tauri::command]
+fn release_pet_prompt(state: tauri::State<PetPrompt>) {
+    state.hold.store(false, Ordering::Relaxed);
+}
+
+/// 复制自动监听开关（pet 设置或托盘里切换，默认开）。
 #[tauri::command]
 fn set_clip_monitor(state: tauri::State<ClipMonitor>, enabled: bool) {
     state.enabled.store(enabled, Ordering::Relaxed);
@@ -138,11 +198,18 @@ fn main() {
         .plugin(tauri_plugin_clipboard_manager::init())
         .manage(ClipImage(Mutex::new(None)))
         .manage(ClipMonitor {
-            enabled: AtomicBool::new(false),
+            enabled: AtomicBool::new(true),
             last: Mutex::new(String::new()),
+        })
+        .manage(PetPrompt {
+            token: std::sync::atomic::AtomicU64::new(0),
+            hold: AtomicBool::new(false),
         })
         .invoke_handler(tauri::generate_handler![
             toggle_pet,
+            hide_pet,
+            hold_pet_prompt,
+            release_pet_prompt,
             set_clip_monitor,
             take_clip_image
         ])
@@ -166,7 +233,7 @@ fn main() {
             )?;
             app.global_shortcut().register(feed_shortcut)?;
 
-            // 复制自动监听后台线程（默认关；剪贴板读取在此非主线程进行，先 sleep 让事件循环起来）
+            // 复制自动监听后台线程（默认开；剪贴板读取在此非主线程进行，先 sleep 让事件循环起来）
             let mon_app = app.handle().clone();
             thread::spawn(move || loop {
                 thread::sleep(Duration::from_millis(800));
@@ -193,25 +260,32 @@ fn main() {
                 emit_text_capture(&mon_app, &trimmed, false);
             });
 
-            // 托盘：显示 / 隐藏桌宠 + 退出
-            let show_i = MenuItem::with_id(app, "show", "显示桌宠", true, None::<&str>)?;
-            let hide_i = MenuItem::with_id(app, "hide", "隐藏桌宠", true, None::<&str>)?;
+            // 托盘：投喂提示 + 复制监听 + 退出
+            let show_i = MenuItem::with_id(app, "show", "显示投喂提示", true, None::<&str>)?;
+            let hide_i = MenuItem::with_id(app, "hide", "隐藏投喂提示", true, None::<&str>)?;
+            let watch_on_i = MenuItem::with_id(app, "watch_on", "开启复制监听", true, None::<&str>)?;
+            let watch_off_i = MenuItem::with_id(app, "watch_off", "关闭复制监听", true, None::<&str>)?;
             let quit_i = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&show_i, &hide_i, &quit_i])?;
+            let menu = Menu::with_items(app, &[&show_i, &hide_i, &watch_on_i, &watch_off_i, &quit_i])?;
             let mut tray = TrayIconBuilder::new()
-                .tooltip("KnowledgeX 桌宠 · 投喂")
+                .title("KX")
+                .tooltip("KnowledgeX 投喂 · 复制监听已开启")
+                .icon_as_template(false)
                 .menu(&menu)
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "show" => {
-                        if let Some(p) = app.get_webview_window("pet") {
-                            let _ = p.show();
-                            let _ = p.set_focus();
-                        }
+                        show_pet(app, true);
                     }
                     "hide" => {
                         if let Some(p) = app.get_webview_window("pet") {
                             let _ = p.hide();
                         }
+                    }
+                    "watch_on" => {
+                        app.state::<ClipMonitor>().enabled.store(true, Ordering::Relaxed);
+                    }
+                    "watch_off" => {
+                        app.state::<ClipMonitor>().enabled.store(false, Ordering::Relaxed);
                     }
                     "quit" => app.exit(0),
                     _ => {}
@@ -220,7 +294,7 @@ fn main() {
             if let Some(icon) = app.default_window_icon() {
                 tray = tray.icon(icon.clone());
             }
-            let _tray = tray.build(app)?;
+            app.manage(tray.build(app)?);
 
             Ok(())
         })

@@ -24,7 +24,7 @@
       {
         "label": "pet",
         "title": "KnowledgeX 桌宠",
-        "url": "static/pet/index.html?v=20260615b",
+        "url": "static/pet/index.html?v=20260617a",
         "width": 300,
         "height": 180,
         "resizable": false,
@@ -34,7 +34,7 @@
         "shadow": true,
         "transparent": false,
         "dragDropEnabled": false,
-        "visible": true
+        "visible": false
       }
     ],
     "security": {
